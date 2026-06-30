@@ -635,6 +635,203 @@ class StateManager {
       reader.readAsText(file);
     });
   }
+
+  importXLSX(file) {
+    return new Promise((resolve, reject) => {
+      if (typeof XLSX === "undefined") {
+        return reject(new Error("Excel parsing library (SheetJS) is not loaded yet. Check your connection."));
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          
+          if (jsonData.length <= 1) {
+            return reject(new Error("Excel sheet is empty or header only."));
+          }
+          
+          const headers = jsonData[0].map(h => String(h || "").trim().toLowerCase());
+          
+          // Detect TradingView Strategy Tester export
+          const isTradingView = headers.includes("trade #") && headers.includes("type") && headers.includes("date/time");
+          
+          const importedTrades = [];
+          
+          if (isTradingView) {
+            const tradeNoIdx = headers.indexOf("trade #");
+            const typeIdx = headers.indexOf("type");
+            const signalIdx = headers.indexOf("signal");
+            const dateTimeIdx = headers.indexOf("date/time");
+            const priceIdx = headers.findIndex(h => h.includes("price"));
+            const contractsIdx = headers.indexOf("contracts");
+            const profitIdx = headers.findIndex(h => h.includes("profit"));
+            
+            // Group rows by trade number
+            const groups = {};
+            for (let i = 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length === 0) continue;
+              const tradeNo = String(row[tradeNoIdx] || "").trim();
+              if (!tradeNo) continue;
+              
+              if (!groups[tradeNo]) {
+                groups[tradeNo] = [];
+              }
+              groups[tradeNo].push(row);
+            }
+            
+            // Reconstruct trades from paired entry/exit rows
+            Object.keys(groups).forEach(tradeNo => {
+              const rows = groups[tradeNo];
+              const entryRow = rows.find(r => String(r[typeIdx] || "").toLowerCase().includes("entry"));
+              const exitRow = rows.find(r => String(r[typeIdx] || "").toLowerCase().includes("exit"));
+              
+              if (entryRow && exitRow) {
+                const typeStr = String(entryRow[typeIdx]).toLowerCase();
+                const direction = typeStr.includes("long") ? "long" : "short";
+                
+                const entryDateTime = normalizeDateTime(entryRow[dateTimeIdx]);
+                const exitDateTime = normalizeDateTime(exitRow[dateTimeIdx]);
+                
+                const entryPrice = parseFloat(entryRow[priceIdx]) || 0;
+                const exitPrice = parseFloat(exitRow[priceIdx]) || 0;
+                const qty = parseFloat(entryRow[contractsIdx]) || 0;
+                const profitVal = parseFloat(exitRow[profitIdx]) || 0;
+                
+                const signalText = String(entryRow[signalIdx] || "").trim();
+                let symbol = "UNKNOWN";
+                if (signalText) {
+                  symbol = signalText.split(" ")[0].toUpperCase();
+                  if (symbol.includes("ENTRY") || symbol.includes("EXIT") || symbol.includes("BUY") || symbol.includes("SELL")) {
+                    symbol = "TV_STRAT";
+                  }
+                }
+                
+                importedTrades.push({
+                  id: "tv_" + tradeNo + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+                  symbol: symbol,
+                  direction: direction,
+                  entryDateTime: entryDateTime,
+                  exitDateTime: exitDateTime,
+                  entryPrice: entryPrice,
+                  exitPrice: exitPrice,
+                  qty: qty,
+                  stopLoss: null,
+                  fees: 0,
+                  setup: "TradingView Strategy",
+                  notes: `Imported TradingView Trade #${tradeNo}. Signal: ${signalText}`,
+                  lessons: "",
+                  screenshotUrl: "",
+                  signalEntryPrice: entryPrice,
+                  signalExitPrice: exitPrice,
+                  accountId: this.settings.currentAccount || "Personal",
+                  assetClass: "stocks",
+                  status: "executed",
+                  overridePnl: true,
+                  manualPnl: profitVal,
+                  interventionType: "followed",
+                  maxPrice: null,
+                  minPrice: null
+                });
+              }
+            });
+          } else {
+            // General custom template Excel import (matching CSV headers)
+            const getColIdx = (name) => headers.indexOf(name);
+            
+            const symbolIdx = getColIdx("symbol");
+            const directionIdx = getColIdx("direction");
+            const entryTimeIdx = getColIdx("entrydatetime");
+            const exitTimeIdx = getColIdx("exitdatetime");
+            const entryPriceIdx = getColIdx("entryprice");
+            const exitPriceIdx = getColIdx("exitprice");
+            const qtyIdx = getColIdx("qty");
+            
+            if (symbolIdx === -1 || entryPriceIdx === -1 || exitPriceIdx === -1 || qtyIdx === -1) {
+              return reject(new Error("Excel sheet missing required headers (symbol, entryprice, exitprice, qty)"));
+            }
+            
+            for (let i = 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length === 0) continue;
+              
+              const symbol = String(row[symbolIdx] || "UNKNOWN").toUpperCase();
+              const entryPrice = parseFloat(row[entryPriceIdx]) || 0;
+              const exitPrice = parseFloat(row[exitPriceIdx]) || 0;
+              const qty = parseFloat(row[qtyIdx]) || 0;
+              if (!symbol || isNaN(entryPrice) || isNaN(exitPrice) || isNaN(qty)) continue;
+              
+              const direction = String(row[directionIdx] || "").toLowerCase() === "short" ? "short" : "long";
+              const entryTime = normalizeDateTime(row[entryTimeIdx]);
+              const exitTime = normalizeDateTime(row[exitTimeIdx]);
+              
+              const stopLoss = row[getColIdx("stoploss")] ? parseFloat(row[getColIdx("stoploss")]) : null;
+              const fees = row[getColIdx("fees")] ? parseFloat(row[getColIdx("fees")]) : 0;
+              const setup = String(row[getColIdx("setup")] || "").trim();
+              const notes = String(row[getColIdx("notes")] || "").trim();
+              const lessons = String(row[getColIdx("lessons")] || "").trim();
+              const screenshotUrl = String(row[getColIdx("screenshoturl")] || "").trim();
+              const signalEntryPrice = row[getColIdx("signalentryprice")] ? parseFloat(row[getColIdx("signalentryprice")]) : null;
+              const signalExitPrice = row[getColIdx("signalexitprice")] ? parseFloat(row[getColIdx("signalexitprice")]) : null;
+              const mistake = String(row[getColIdx("mistake")] || "").trim();
+              const accountId = String(row[getColIdx("accountid")] || "").trim() || (this.settings.currentAccount || "Personal");
+              const assetClass = String(row[getColIdx("assetclass")] || "").trim() || "stocks";
+              const status = String(row[getColIdx("status")] || "").trim() || "executed";
+              const overridePnl = String(row[getColIdx("overridepnl")] || "").trim() === "true";
+              const manualPnl = row[getColIdx("manualpnl")] ? parseFloat(row[getColIdx("manualpnl")]) : null;
+              const interventionType = String(row[getColIdx("interventiontype")] || "").trim() || "followed";
+              const maxPrice = row[getColIdx("maxprice")] ? parseFloat(row[getColIdx("maxprice")]) : null;
+              const minPrice = row[getColIdx("minprice")] ? parseFloat(row[getColIdx("minprice")]) : null;
+              
+              importedTrades.push({
+                id: String(row[getColIdx("id")] || "").trim() || "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+                symbol,
+                direction,
+                entryDateTime: entryTime || new Date().toISOString(),
+                exitDateTime: exitTime || new Date().toISOString(),
+                entryPrice,
+                exitPrice,
+                qty,
+                stopLoss,
+                fees,
+                setup,
+                notes,
+                lessons,
+                screenshotUrl,
+                signalEntryPrice,
+                signalExitPrice,
+                mistake,
+                accountId,
+                assetClass,
+                status,
+                overridePnl,
+                manualPnl,
+                interventionType,
+                maxPrice,
+                minPrice
+              });
+            }
+          }
+          
+          if (importedTrades.length === 0) {
+            return reject(new Error("No valid trades found in Excel sheet."));
+          }
+          
+          this.trades = [...this.trades, ...importedTrades];
+          this.saveToStorage();
+          resolve(importedTrades.length);
+        } catch (err) {
+          reject(new Error("Failed to parse Excel file: " + err.message));
+        }
+      };
+      reader.onerror = () => reject(new Error("File reading error."));
+      reader.readAsArrayBuffer(file);
+    });
+  }
 }
 
 export const AppState = new StateManager();

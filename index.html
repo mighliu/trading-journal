@@ -77,7 +77,7 @@
         <button id="importBtn" class="btn btn-secondary">
           <i data-lucide="upload"></i> Import
         </button>
-        <input type="file" id="importFileInput" class="hidden" accept=".json,.csv">
+        <input type="file" id="importFileInput" class="hidden" accept=".json,.csv,.xlsx">
 
         <button id="themeToggleBtn" class="btn-icon" title="Toggle Dark/Light Theme" style="margin-right: 8px;">
           <i data-lucide="sun" id="themeSunIcon" class="hidden"></i>
@@ -1142,6 +1142,8 @@
 
   </div>
 
+  <!-- Load SheetJS for Excel .xlsx parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Load script type module orchestrator -->
   <script type="module" src="js/main.js"></script>
 </body>

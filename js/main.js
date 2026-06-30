@@ -263,14 +263,27 @@ function setupActionButtons() {
       const ext = file.name.split('.').pop().toLowerCase();
       if (ext === "json") {
         AppState.importJSON(file)
-          .then(count => showToast(`Successfully imported ${count} trades from JSON file!`, "success"))
+          .then(count => {
+            showToast(`Successfully imported ${count} trades from JSON file!`, "success");
+            handleStateChange();
+          })
           .catch(err => showToast(err.message, "error"));
       } else if (ext === "csv") {
         AppState.importCSV(file)
-          .then(count => showToast(`Successfully imported ${count} trades from CSV file!`, "success"))
+          .then(count => {
+            showToast(`Successfully imported ${count} trades from CSV file!`, "success");
+            handleStateChange();
+          })
+          .catch(err => showToast(err.message, "error"));
+      } else if (ext === "xlsx") {
+        AppState.importXLSX(file)
+          .then(count => {
+            showToast(`Successfully imported ${count} trades from Excel file!`, "success");
+            handleStateChange();
+          })
           .catch(err => showToast(err.message, "error"));
       } else {
-        showToast("Unsupported file format. Please upload JSON or CSV.", "error");
+        showToast("Unsupported file format. Please upload JSON, CSV, or XLSX.", "error");
       }
       
       // Reset file input value
