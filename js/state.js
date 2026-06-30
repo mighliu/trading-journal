@@ -657,18 +657,24 @@ class StateManager {
           const headers = jsonData[0].map(h => String(h || "").trim().toLowerCase());
           
           // Detect TradingView Strategy Tester export
-          const isTradingView = headers.includes("trade #") && headers.includes("type") && headers.includes("date/time");
+          const isTradingView = (headers.includes("trade number") || headers.includes("trade #")) && 
+                                headers.includes("type") && 
+                                (headers.includes("date and time") || headers.includes("date/time"));
           
           const importedTrades = [];
           
           if (isTradingView) {
-            const tradeNoIdx = headers.indexOf("trade #");
+            const tradeNoIdx = headers.includes("trade number") ? headers.indexOf("trade number") : headers.indexOf("trade #");
             const typeIdx = headers.indexOf("type");
             const signalIdx = headers.indexOf("signal");
-            const dateTimeIdx = headers.indexOf("date/time");
-            const priceIdx = headers.findIndex(h => h.includes("price"));
-            const contractsIdx = headers.indexOf("contracts");
-            const profitIdx = headers.findIndex(h => h.includes("profit"));
+            const dateTimeIdx = headers.includes("date and time") ? headers.indexOf("date and time") : headers.indexOf("date/time");
+            
+            const priceIdx = headers.includes("price usd") ? headers.indexOf("price usd") : headers.findIndex(h => h.includes("price"));
+            const contractsIdx = headers.includes("size (qty)") ? headers.indexOf("size (qty)") : headers.indexOf("contracts");
+            const profitIdx = headers.includes("net pnl usd") ? headers.indexOf("net pnl usd") : headers.findIndex(h => h.includes("profit"));
+            
+            const mfePctIdx = headers.includes("favorable excursion %") ? headers.indexOf("favorable excursion %") : headers.findIndex(h => h.includes("favorable excursion %"));
+            const maePctIdx = headers.includes("adverse excursion %") ? headers.indexOf("adverse excursion %") : headers.findIndex(h => h.includes("adverse excursion %"));
             
             // Group rows by trade number
             const groups = {};
@@ -702,6 +708,31 @@ class StateManager {
                 const qty = parseFloat(entryRow[contractsIdx]) || 0;
                 const profitVal = parseFloat(exitRow[profitIdx]) || 0;
                 
+                // Reconstruct maxPrice and minPrice from excursions
+                let maxPrice = null;
+                let minPrice = null;
+                
+                const mfePct = mfePctIdx !== -1 && exitRow[mfePctIdx] !== undefined ? Math.abs(parseFloat(exitRow[mfePctIdx])) : null;
+                const maePct = maePctIdx !== -1 && exitRow[maePctIdx] !== undefined ? Math.abs(parseFloat(exitRow[maePctIdx])) : null;
+                
+                if (entryPrice > 0) {
+                  if (direction === "long") {
+                    if (mfePct !== null && !isNaN(mfePct)) {
+                      maxPrice = entryPrice * (1 + mfePct / 100);
+                    }
+                    if (maePct !== null && !isNaN(maePct)) {
+                      minPrice = entryPrice * (1 - maePct / 100);
+                    }
+                  } else {
+                    if (mfePct !== null && !isNaN(mfePct)) {
+                      minPrice = entryPrice * (1 - mfePct / 100);
+                    }
+                    if (maePct !== null && !isNaN(maePct)) {
+                      maxPrice = entryPrice * (1 + maePct / 100);
+                    }
+                  }
+                }
+                
                 const signalText = String(entryRow[signalIdx] || "").trim();
                 let symbol = "UNKNOWN";
                 if (signalText) {
@@ -734,8 +765,8 @@ class StateManager {
                   overridePnl: true,
                   manualPnl: profitVal,
                   interventionType: "followed",
-                  maxPrice: null,
-                  minPrice: null
+                  maxPrice: maxPrice,
+                  minPrice: minPrice
                 });
               }
             });
