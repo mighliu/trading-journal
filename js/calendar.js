@@ -99,9 +99,15 @@ export function renderCalendar(year, month, trades) {
     calendarGrid.appendChild(cell);
   }
 
-  // Next month padding days to fill 42 cells grid (6 rows of 7)
+  // Next month padding days to fill grid (4 rows = 28, 5 rows = 35, 6 rows = 42 cells)
   const totalCellsUsed = firstDayIndex + totalDays;
-  const remainingCells = 42 - totalCellsUsed;
+  let totalGridCells = 42;
+  if (totalCellsUsed <= 28) {
+    totalGridCells = 28;
+  } else if (totalCellsUsed <= 35) {
+    totalGridCells = 35;
+  }
+  const remainingCells = totalGridCells - totalCellsUsed;
   for (let i = 1; i <= remainingCells; i++) {
     const paddingDay = document.createElement("div");
     paddingDay.className = "calendar-cell empty";
