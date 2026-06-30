@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TradeFlow | Premium Trading Journal</title>
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="logo-section">
+        <i data-lucide="trending-up" class="logo-icon"></i>
+        <span class="logo-text">TradeFlow</span>
+      </div>
+
+      <!-- Header actions -->
+      <div class="header-actions">
+        <!-- Account Switcher -->
+        <div class="filter-group">
+          <select id="accountSelector" title="Switch Trading Account" style="border-color: var(--accent); font-weight: 600;">
+            <option value="Personal">Personal Account</option>
+            <option value="Prop Firm">Prop Firm Account</option>
+          </select>
+        </div>
+
+        <!-- Date range selector -->
+        <div class="filter-group">
+          <select id="filterDatePreset">
+            <option value="today">Today</option>
+            <option value="thisWeek">This Week</option>
+            <option value="thisMonth">This Month</option>
+            <option value="thisQuarter">This Quarter</option>
+            <option value="ytd">Year to Date (YTD)</option>
+            <option value="allTime" selected>All Time</option>
+            <option value="custom">Custom Range...</option>
+          </select>
+        </div>
+        
+        <!-- Custom Date range wrapper (hidden by default) -->
+        <div id="customDateRange" class="custom-date-inputs hidden">
+          <input type="date" id="filterStartDate" title="Start Date">
+          <span class="date-range-separator"><i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></span>
+          <input type="date" id="filterEndDate" title="End Date">
+        </div>
+
+        <button id="seedDemoHeaderBtn" class="btn btn-secondary hidden" title="Seed Realistic Data">
+          <i data-lucide="database"></i> Seed Data
+        </button>
+
+        <button id="addNewTradeBtn" class="btn btn-primary">
+          <i data-lucide="plus"></i> New Trade <span class="muted" style="font-size: 0.75rem; margin-left: 4px;">(N)</span>
+        </button>
+
+        <div class="dropdown">
+          <button class="btn btn-secondary">
+            <i data-lucide="download"></i> Export <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+          </button>
+          <div class="dropdown-content">
+            <button id="exportCsvBtn"><i data-lucide="file-spreadsheet"></i> CSV File</button>
+            <button id="exportJsonBtn"><i data-lucide="braces"></i> JSON File</button>
+          </div>
+        </div>
+
+        <button id="importBtn" class="btn btn-secondary">
+          <i data-lucide="upload"></i> Import
+        </button>
+        <input type="file" id="importFileInput" class="hidden" accept=".json,.csv">
+
+        <button id="themeToggleBtn" class="btn-icon" title="Toggle Dark/Light Theme" style="margin-right: 8px;">
+          <i data-lucide="sun" id="themeSunIcon" class="hidden"></i>
+          <i data-lucide="moon" id="themeMoonIcon"></i>
+        </button>
+        <button id="settingsBtn" class="btn-icon" title="Journal Settings">
+          <i data-lucide="settings"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Seed Notice Banner (appears when database is empty) -->
+    <div id="seedNotice" class="seed-notice-banner hidden">
+      <div class="seed-notice-content">
+        <i data-lucide="info" style="width: 24px; height: 24px;"></i>
+        <div>
+          <h4 class="bold">Welcome to TradeFlow Journal!</h4>
+          <p class="muted" style="font-size: 0.875rem;">Your journal is currently empty. Seed the dashboard with realistic trade data to see the charts, stats, and calendar come to life instantly!</p>
+        </div>
+      </div>
+      <button id="seedDemoNoticeBtn" class="btn btn-primary">
+        <i data-lucide="database"></i> Load Demo Data
+      </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Stats Banner (Horizontal Row of 8 Cards) -->
+      <section class="stats-banner">
+        <!-- Net P&L Card -->
+        <div class="stat-card">
+          <span class="stat-label">Net P&L <i data-lucide="wallet" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerPnl" class="stat-value">$0.00</span>
+        </div>
+        <!-- Balance Card -->
+        <div class="stat-card">
+          <span class="stat-label">Account Balance <i data-lucide="banknote" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerBalance" class="stat-value">$25,000.00</span>
+        </div>
+        <!-- Growth Card -->
+        <div class="stat-card">
+          <span class="stat-label">Growth <i data-lucide="percent" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerGrowth" class="stat-value">0.00%</span>
+        </div>
+        <!-- Win Rate Card -->
+        <div class="stat-card">
+          <span class="stat-label">Win Rate <i data-lucide="award" style="width: 12px; height: 12px;"></i></span>
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <span id="bannerWinRate" class="stat-value">0.0%</span>
+            <div class="winrate-circle-wrapper" style="margin-top: -8px;">
+              <svg class="winrate-circle" viewBox="0 0 36 36">
+                <path class="winrate-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path id="bannerWinRateProgress" class="winrate-circle-progress" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <!-- Profit Factor Card -->
+        <div class="stat-card">
+          <span class="stat-label">
+            Profit Factor 
+            <span class="tooltip-trigger" data-tooltip="Sum of gross profits divided by sum of gross losses. Ratios above 1.5 indicate highly profitable execution.">
+              <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+            </span>
+          </span>
+          <span id="bannerProfitFactor" class="stat-value">0.00</span>
+        </div>
+        <!-- Avg Win/Loss Card -->
+        <div class="stat-card">
+          <span class="stat-label">Avg Win / Avg Loss <i data-lucide="scale" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerAvgWinLoss" class="stat-value" style="font-size: 1.15rem; margin-top: 4px;">$0.00 / $0.00</span>
+        </div>
+        <!-- Best Streak Card -->
+        <div class="stat-card">
+          <span class="stat-label">Best Streak <i data-lucide="zap" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerBestStreak" class="stat-value">🔥 0</span>
+        </div>
+        <!-- Current Streak Card -->
+        <div class="stat-card">
+          <span class="stat-label">Current Streak <i data-lucide="repeat" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerCurrentStreak" class="stat-value">None</span>
+        </div>
+        <!-- Sharpe Ratio Card -->
+        <div class="stat-card">
+          <span class="stat-label">
+            Sharpe Ratio
+            <span class="tooltip-trigger" data-tooltip="Measures return consistency by comparing your average trade outcome against its deviation (variance). Higher is better.">
+              <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+            </span>
+          </span>
+          <span id="bannerSharpe" class="stat-value">0.00</span>
+        </div>
+        <!-- Sortino Ratio Card -->
+        <div class="stat-card">
+          <span class="stat-label">
+            Sortino Ratio
+            <span class="tooltip-trigger" data-tooltip="Similar to Sharpe, but only penalizes downside volatility (losses), measuring your protection against disadvantageous trades.">
+              <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+            </span>
+          </span>
+          <span id="bannerSortino" class="stat-value">0.00</span>
+        </div>
+        <!-- Expectancy Card -->
+        <div class="stat-card">
+          <span class="stat-label">
+            Expectancy
+            <span class="tooltip-trigger" data-tooltip="The average amount you expect to win (or lose) per trade. Calculated as Net P&L divided by total trade count.">
+              <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+            </span>
+          </span>
+          <span id="bannerExpectancy" class="stat-value">$0.00</span>
+        </div>
+        <!-- Max Drawdown Card -->
+        <div class="stat-card">
+          <span class="stat-label">
+            Max Drawdown
+            <span class="tooltip-trigger" data-tooltip="The maximum peak-to-trough drop in account equity from your highest balance. Shown in dollars and percentage.">
+              <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+            </span>
+          </span>
+          <span id="bannerMaxDrawdown" class="stat-value">$0.00 (0.0%)</span>
+        </div>
+        <!-- Recovery Factor Card -->
+        <div class="stat-card">
+          <span class="stat-label">
+            Recovery Factor
+            <span class="tooltip-trigger" data-tooltip="Measures your portfolio's recovery capacity. Calculated as Net P&L divided by your Max Drawdown. Ratios > 3 are excellent.">
+              <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+            </span>
+          </span>
+          <span id="bannerRecoveryFactor" class="stat-value">0.00</span>
+        </div>
+        <!-- Weekly Summary Card -->
+        <div class="stat-card" style="border-color: rgba(59, 130, 246, 0.2);">
+          <span class="stat-label">This Week <i data-lucide="calendar" style="width: 12px; height: 12px; color: #3b82f6;"></i></span>
+          <span id="bannerWeeklyPnl" class="stat-value">$0.00</span>
+        </div>
+        <!-- Monthly Summary Card -->
+        <div class="stat-card" style="border-color: rgba(139, 92, 246, 0.2);">
+          <span class="stat-label">This Month <i data-lucide="calendar-days" style="width: 12px; height: 12px; color: #8b5cf6;"></i></span>
+          <span id="bannerMonthlyPnl" class="stat-value">$0.00</span>
+        </div>
+      </section>
+
+      <!-- Filter Nav Bar & Tab Content -->
+      <section class="filter-nav-section">
+        <!-- Tab selector buttons -->
+        <div class="view-navigation">
+          <button class="nav-tab-btn active" data-tab="dashboard">
+            <i data-lucide="layout-dashboard" style="width: 16px; height: 16px; vertical-align: text-bottom; margin-right: 6px;"></i>Dashboard
+          </button>
+          <button class="nav-tab-btn" data-tab="tradeLog">
+            <i data-lucide="list" style="width: 16px; height: 16px; vertical-align: text-bottom; margin-right: 6px;"></i>Trade Log
+          </button>
+          <button class="nav-tab-btn" data-tab="calendar">
+            <i data-lucide="calendar" style="width: 16px; height: 16px; vertical-align: text-bottom; margin-right: 6px;"></i>Calendar
+          </button>
+          <button class="nav-tab-btn" data-tab="analytics">
+            <i data-lucide="pie-chart" style="width: 16px; height: 16px; vertical-align: text-bottom; margin-right: 6px;"></i>Analytics
+          </button>
+          <button class="nav-tab-btn hidden" data-tab="intervention" id="tabInterventionBtn">
+            <i data-lucide="award" style="width: 16px; height: 16px; vertical-align: text-bottom; margin-right: 6px;"></i>Intervention Edge
+          </button>
+          <button class="nav-tab-btn" data-tab="risk" id="tabRiskBtn">
+            <i data-lucide="shield" style="width: 16px; height: 16px; vertical-align: text-bottom; margin-right: 6px;"></i>Risk & Replay
+          </button>
+          <div class="nav-badge">
+            <i data-lucide="database" style="width: 12px; height: 12px;"></i>
+            <span><strong id="globalTradeCount">0</strong> Trades</span>
+          </div>
+        </div>
+
+        <!-- Secondary filters grid (only visible for relevant views or shared globally) -->
+        <div class="filters-grid">
+          <div class="filter-group">
+            <label for="filterSymbol">Symbol Search</label>
+            <input type="text" id="filterSymbol" placeholder="e.g. TSLA, NVDA">
+          </div>
+          <div class="filter-group">
+            <label for="filterDirection">Direction</label>
+            <select id="filterDirection">
+              <option value="all">All Directions</option>
+              <option value="long">Long</option>
+              <option value="short">Short</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filterAssetClass">Asset Class</label>
+            <select id="filterAssetClass">
+              <option value="all">All Assets</option>
+              <option value="stocks">Stocks</option>
+              <option value="options">Options</option>
+              <option value="futures">Futures</option>
+              <option value="crypto">Crypto</option>
+              <option value="forex">Forex</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filterStatus">Status</label>
+            <select id="filterStatus">
+              <option value="executed" selected>Taken (Executed)</option>
+              <option value="skipped">Skipped (Not Taken)</option>
+              <option value="all">All Statuses</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filterOutcome">Outcome</label>
+            <select id="filterOutcome">
+              <option value="all">All Outcomes</option>
+              <option value="win">Wins</option>
+              <option value="loss">Losses</option>
+              <option value="breakeven">Breakeven</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="filterSetup">Setup Tag</label>
+            <select id="filterSetup">
+              <option value="all">All Setups</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB CONTENT: DASHBOARD ==================== -->
+      <div id="dashboardTabContent" class="tab-content">
+        <div class="dashboard-grid">
+          <!-- Cumulative Equity Curve Card -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="line-chart" class="profit"></i> Cumulative Equity Curve</h3>
+              <span class="muted" style="font-size: 0.75rem;">Account balance growth over time</span>
+            </div>
+            <div class="chart-container-large">
+              <canvas id="equityCurveChart"></canvas>
+            </div>
+          </div>
+          <!-- Daily P&L Bar Card -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="bar-chart-2" style="color: var(--accent)"></i> Daily P&L</h3>
+              <span class="muted" style="font-size: 0.75rem;">Daily Net Performance</span>
+            </div>
+            <div class="chart-container-large">
+              <canvas id="dailyPnlChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TAB CONTENT: TRADE LOG ==================== -->
+      <div id="tradeLogTabContent" class="tab-content hidden">
+        <div class="log-header-row">
+          <h2 class="log-title">
+            <i data-lucide="list"></i>
+            Trade History
+            <span id="logTradeCount" class="log-count-badge">0 Trades</span>
+          </h2>
+          <div class="page-size-selector" style="display: flex; gap: 16px; align-items: center;">
+            <div style="position: relative;">
+              <input type="text" id="logSearchInput" placeholder="Search symbol, setups, notes..." style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 12px 6px 32px; font-size: 0.8125rem; color: var(--text-primary); width: 220px; outline: none;">
+              <i data-lucide="search" style="position: absolute; left: 10px; top: 8px; width: 14px; height: 14px; color: var(--text-muted);"></i>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <label for="pageSizeSelect">Show</label>
+              <select id="pageSizeSelect" class="page-size-select">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="log-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;"></th>
+                <th style="width: 50px; text-align: center;">#</th>
+                <th class="sortable" data-sort="exitDateTime" style="cursor: pointer; user-select: none;">Exit Date <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th class="sortable" data-sort="symbol" style="cursor: pointer; user-select: none;">Symbol <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th class="sortable" data-sort="direction" style="cursor: pointer; user-select: none;">Direction <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th>Qty</th>
+                <th>Entry Price</th>
+                <th>Exit Price</th>
+                <th class="sortable" data-sort="riskReward" style="cursor: pointer; user-select: none;">R:R <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th class="sortable" data-sort="duration" style="cursor: pointer; user-select: none;">Duration <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th>Fees</th>
+                <th class="sortable" data-sort="netPnl" style="cursor: pointer; user-select: none;">Net P&L <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th class="sortable" data-sort="pnlPercent" style="cursor: pointer; user-select: none;">% Ret <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; vertical-align: middle; opacity: 0.5;"></i></th>
+                <th style="width: 80px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tradeLogTbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+        <!-- Pagination controls -->
+        <div id="logPagination" class="pagination">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- ==================== TAB CONTENT: CALENDAR ==================== -->
+      <div id="calendarTabContent" class="tab-content hidden">
+        <div class="calendar-wrapper">
+          <div class="calendar-header">
+            <div class="calendar-nav">
+              <button id="calendarPrevMonth" class="btn btn-secondary btn-icon"><i data-lucide="chevron-left"></i></button>
+              <span id="calendarMonthLabel" class="calendar-month-label">June 2026</span>
+              <button id="calendarNextMonth" class="btn btn-secondary btn-icon"><i data-lucide="chevron-right"></i></button>
+            </div>
+            <span class="muted" style="font-size: 0.8125rem;"><i data-lucide="info" style="width: 14px; height: 14px; vertical-align: text-bottom; margin-right: 4px;"></i>Click days to view trades</span>
+          </div>
+
+          <div id="calendarGrid" class="calendar-grid">
+            <!-- Dynamically populated grid cells -->
+          </div>
+
+          <!-- Monthly Stats Summary -->
+          <div class="calendar-summary-row">
+            <div class="cal-summary-card">
+              <span class="stat-label">Month Total P&L</span>
+              <span id="calSummaryPnl" class="stat-value">$0.00</span>
+            </div>
+            <div class="cal-summary-card">
+              <span class="stat-label">Wins</span>
+              <span id="calSummaryWins" class="stat-value" style="color: var(--profit)">0</span>
+            </div>
+            <div class="cal-summary-card">
+              <span class="stat-label">Losses</span>
+              <span id="calSummaryLosses" class="stat-value" style="color: var(--loss)">0</span>
+            </div>
+            <div class="cal-summary-card">
+              <span class="stat-label">Win Rate</span>
+              <span id="calSummaryWinRate" class="stat-value">0.0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TAB CONTENT: ANALYTICS ==================== -->
+      <div id="analyticsTabContent" class="tab-content hidden">
+        <div class="analytics-grid">
+          <!-- Day of week P&L -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="calendar-days"></i> P&L by Day of the Week</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="dayOfWeekChart"></canvas>
+            </div>
+          </div>
+          <!-- Performance by Setup -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="tag"></i> P&L by Setup Tag</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="setupTagChart"></canvas>
+            </div>
+          </div>
+          <!-- Performance by Asset Class -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="layers" style="color: var(--accent)"></i> P&L by Asset Class</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="assetClassChart"></canvas>
+            </div>
+          </div>
+          <!-- Win Rate by Symbol -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="bar-chart-3"></i> Top Symbols (Volume vs Win Rate)</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="symbolChart"></canvas>
+            </div>
+          </div>
+          <!-- Mistakes Distribution -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="skull" style="color: var(--loss)"></i> P&L by Behavioral Mistake</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="mistakeChart"></canvas>
+            </div>
+          </div>
+          <!-- Slippage by Ticker -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="shuffle" style="color: #fbbf24"></i> Execution Slippage by Symbol</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="slippageSymbolChart"></canvas>
+            </div>
+          </div>
+          <!-- Hourly Performance -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="clock" style="color: var(--accent)"></i> Net P&L by Hour of Entry</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="hourPnlChart"></canvas>
+            </div>
+          </div>
+          <!-- Win/Loss Size Distribution -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="bar-chart" style="color: #10b981"></i> Win/Loss Size Distribution</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="distributionChart"></canvas>
+            </div>
+          </div>
+          <!-- Cumulative Slippage Trend -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="trending-up" style="color: #3b82f6"></i> Cumulative Execution Slippage Curve</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="cumulativeSlippageChart"></canvas>
+            </div>
+          </div>
+          <!-- Hold Time Performance -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="hourglass" style="color: #fbbf24"></i> Performance by Hold Time</h3>
+            </div>
+            <div class="chart-container-medium">
+              <canvas id="holdTimeChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Intervention Edge Tab Content -->
+      <div id="interventionTabContent" class="tab-content hidden">
+        <!-- Banner Stats Row -->
+        <div style="display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 16px; margin-bottom: 20px; align-items: stretch;">
+          
+          <!-- IER Gauge Card -->
+          <div class="chart-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center;">
+            <h3 class="chart-title" style="margin-bottom: 12px;"><i data-lucide="compass" style="color: var(--accent);"></i> Intervention Efficiency (IER)</h3>
+            <span class="muted" style="font-size: 0.75rem; margin-bottom: 16px;">% of manual edits that improved P&L outcomes</span>
+            <div class="winrate-circle-wrapper" style="width: 120px; height: 120px; margin-bottom: 16px; position: relative;">
+              <svg class="winrate-circle" viewBox="0 0 36 36" style="width: 100%; height: 100%;">
+                <path class="winrate-circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" style="stroke: #1f1f23; stroke-width: 2.5;" />
+                <path id="ierGaugeProgress" class="winrate-circle-progress" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" style="stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4));" />
+              </svg>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center;">
+                <span id="ierGaugeValue" class="bold" style="font-size: 1.5rem; color: #fafafa; line-height: 1;">0%</span>
+              </div>
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              Total Manual Interventions: <strong id="ierInterventionCount" style="color: #fafafa;">0</strong>
+            </div>
+          </div>
+
+          <!-- Side-by-Side Performance Table Card -->
+          <div class="chart-card" style="padding: 20px;">
+            <h3 class="chart-title" style="margin-bottom: 16px;"><i data-lucide="table" style="color: #10b981;"></i> Performance Matrix Comparison</h3>
+            <div class="table-wrapper" style="overflow-x: auto;">
+              <table class="performance-matrix-table" style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem;">
+                <thead>
+                  <tr style="border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">
+                    <th style="padding: 10px 8px;">Metric</th>
+                    <th style="padding: 10px 8px; text-align: right;">Actual (Discretionary)</th>
+                    <th style="padding: 10px 8px; text-align: right;">Strategy (Mechanical)</th>
+                    <th style="padding: 10px 8px; text-align: right;">Delta (Adherence Edge)</th>
+                  </tr>
+                </thead>
+                <tbody id="performanceMatrixTbody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Row 1: Dual equity curve -->
+        <div class="chart-card chart-card-full" style="margin-bottom: 20px;">
+          <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div>
+              <h3 class="chart-title"><i data-lucide="split" style="color: var(--accent);"></i> Trader Intervention Edge (Trader Delta)</h3>
+              <span class="muted" style="font-size: 0.75rem;">Discretionary Decisions vs. Mechanical Strategy Rules</span>
+            </div>
+            <!-- Mini banner showing delta calculations -->
+            <div style="display: flex; gap: 12px;">
+              <div class="mini-stat-badge" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem;">
+                <span class="muted">Actual P&L:</span> <strong id="deltaActualPnl">$0.00</strong>
+              </div>
+              <div class="mini-stat-badge" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem;">
+                <span class="muted">Strategy P&L:</span> <strong id="deltaStrategyPnl">$0.00</strong>
+              </div>
+              <div class="mini-stat-badge" id="deltaBadgeContainer" style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; color: var(--accent);">
+                <span>Trader Delta: <strong id="deltaTraderEdge">$0.00</strong></span>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container-large" style="height: 320px; position: relative;">
+            <canvas id="interventionChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Row 2: Category impact & Hourly impact -->
+        <div class="charts-grid-row-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
+          <!-- P&L Impact by Category -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="tag" style="color: #10b981"></i> Delta Impact by Intervention Type</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="interventionAttributionChart"></canvas>
+            </div>
+          </div>
+          <!-- Hourly Intervention Delta -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="clock" style="color: #3b82f6"></i> Hourly Intervention Delta</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="interventionHourlyChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Streak Delta & Adherence/Drawdown -->
+        <div class="charts-grid-row-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+          <!-- Streak Intervention Delta -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="zap" style="color: #f59e0b"></i> Intervention Delta by Streak Context</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="interventionStreakChart"></canvas>
+            </div>
+          </div>
+          <!-- Adherence vs Drawdown -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="activity" style="color: #ec4899"></i> Strategy Adherence vs Actual Drawdown</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="adherenceDrawdownChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ==================== TAB CONTENT: RISK & REPLAY ==================== -->
+      <div id="riskTabContent" class="tab-content hidden">
+        <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 24px;">
+          <!-- 1. Position Sizing Calculator -->
+          <div class="chart-card" style="grid-column: span 2;">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="calculator" style="color: var(--accent)"></i> Position Sizing Calculator</h3>
+            </div>
+            <div class="card-body" style="padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calcBalance">Account Balance ($)</label>
+                  <input type="number" id="calcBalance" value="25000" step="any" class="form-control" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-family: inherit; font-size: 0.875rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calcRiskPct">Risk Percentage (%)</label>
+                  <input type="number" id="calcRiskPct" value="1.0" step="0.1" min="0.1" max="100" class="form-control" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-family: inherit; font-size: 0.875rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calcEntry">Entry Price ($)</label>
+                  <input type="number" id="calcEntry" placeholder="0.00" step="any" class="form-control" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-family: inherit; font-size: 0.875rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label for="calcStop">Stop Loss Price ($)</label>
+                  <input type="number" id="calcStop" placeholder="0.00" step="any" class="form-control" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-family: inherit; font-size: 0.875rem;">
+                </div>
+              </div>
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; justify-content: center; gap: 16px;">
+                <div>
+                  <span class="muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Total Capital at Risk</span>
+                  <div id="calcRiskAmtVal" style="font-size: 1.5rem; font-weight: 700; color: var(--loss); margin-top: 4px;">$250.00</div>
+                </div>
+                <div>
+                  <span class="muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Stop Distance (%)</span>
+                  <div id="calcStopDistPct" style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-top: 4px;">0.00%</div>
+                </div>
+                <div>
+                  <span class="muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Recommended Position Size</span>
+                  <div id="calcRecommendShares" style="font-size: 1.75rem; font-weight: 800; color: var(--profit); margin-top: 4px;">0 Shares</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Risk Metrics & Drawdown Duration Card -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="shield-alert" style="color: #ef4444"></i> Drawdown & Streak Metrics</h3>
+            </div>
+            <div class="card-body" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 0.875rem;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">
+                  Max Days in Drawdown
+                  <span class="tooltip-trigger" data-tooltip="The longest calendar time spent between an account equity peak and its recovery to that peak.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
+                <span id="riskMaxDdDays" class="bold" style="color: var(--text-primary);">0.0 Days</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">
+                  Max Trades in Drawdown
+                  <span class="tooltip-trigger" data-tooltip="The maximum number of consecutive trades taken between an account equity peak and its recovery to that peak.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
+                <span id="riskMaxDdTrades" class="bold" style="color: var(--text-primary);">0 Trades</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">
+                  Current DD Duration
+                  <span class="tooltip-trigger" data-tooltip="The duration (in days and trades) since your last account peak. Highlighted if drawdown grows significant.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
+                <span id="riskCurrentDdDuration" class="bold" style="color: var(--text-primary);">0.0 Days (0 trades)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">
+                  Expected Max Win Streak
+                  <span class="tooltip-trigger" data-tooltip="The Win Streak length expected mathematically based on your win rate. Compares expected streak vs. actual streak.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
+                <span id="riskExpectedWinStreak" class="bold" style="color: var(--profit);">0.0</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span class="muted">
+                  Expected Max Loss Streak
+                  <span class="tooltip-trigger" data-tooltip="The Loss Streak length expected mathematically based on your win rate. Compares expected streak vs. actual streak.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
+                <span id="riskExpectedLossStreak" class="bold" style="color: var(--loss);">0.0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenge Trading & Sequence Performance Group -->
+        <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="flame" style="color: #ef4444"></i> Post-Loss Behavioral Matrix</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 280px;">
+              <canvas id="postLossBehaviorChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="activity" style="color: #a78bfa"></i> Rolling 20-Trade Metrics</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 280px;">
+              <canvas id="rollingPerformanceChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="bar-chart-3" style="color: #fbbf24"></i> R-Multiple Distribution</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 280px;">
+              <canvas id="rMultipleChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="git-commit" style="color: #34d399"></i> P&L by Daily Sequence</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 280px;">
+              <canvas id="tradeSequenceChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="maximize-2" style="color: #34d399"></i> MFE (Maximum Favorable Excursion) vs Realized P&L</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="mfeScatterChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h3 class="chart-title"><i data-lucide="minimize-2" style="color: #ef4444"></i> MAE (Maximum Adverse Excursion) vs Realized P&L</h3>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="maeScatterChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full Width: Timeline Replay / Day Timeline view -->
+        <div class="chart-card" style="margin-bottom: 24px;">
+          <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h3 class="chart-title"><i data-lucide="clock" style="color: #60a5fa"></i> Intraday Trade Replay Timeline</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="muted" style="font-size: 0.75rem;">Select Replay Day:</span>
+              <select id="replayDateSelect" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; height: 28px; background-color: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer; outline: none;"></select>
+            </div>
+          </div>
+          <div class="chart-container-medium" style="height: 250px;">
+            <canvas id="timelineReplayChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Calendar Day slide-over panel detail -->
+    <div id="dayDetailPanel" class="slide-over-panel">
+      <div class="panel-header">
+        <h4 id="dayPanelTitle" class="bold">Day Details</h4>
+        <button id="closeDayPanelBtn" class="btn-icon"><i data-lucide="x"></i></button>
+      </div>
+      <div id="dayPanelContent" class="panel-body">
+        <!-- Day summary and trades rendered here dynamically -->
+      </div>
+    </div>
+
+    <!-- Modals Overlay (Shared wrapper) -->
+    <!-- 1. Add/Edit Trade Modal -->
+    <div id="tradeModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="tradeModalTitle" class="bold">Add New Trade</h3>
+          <button id="closeTradeModalBtn" class="btn-icon"><i data-lucide="x"></i></button>
+        </div>
+        <form id="tradeForm">
+          <div class="modal-body">
+            
+            <!-- Live Calculation Math Panel -->
+            <div class="modal-live-math-panel">
+              <div class="live-math-title">Real-Time Estimation</div>
+              <div class="live-math-grid">
+                <div class="live-math-item">
+                  <span class="live-math-label">Est Gross P&L</span>
+                  <span id="liveGrossPnl" class="live-math-val">$0.00</span>
+                </div>
+                <div class="live-math-item">
+                  <span class="live-math-label">Est Net P&L</span>
+                  <span id="liveNetPnl" class="live-math-val bold">$0.00</span>
+                </div>
+                <div class="live-math-item">
+                  <span class="live-math-label">P&L Percent</span>
+                  <span id="livePnlPercent" class="live-math-val">0.00%</span>
+                </div>
+              </div>
+              <div class="live-math-bottom">
+                <div class="live-math-item">
+                  <span class="live-math-label">Calculated Risk/Reward (R:R)</span>
+                  <span id="liveRiskReward" class="live-math-val">-</span>
+                </div>
+                <div class="live-math-item">
+                  <span class="live-math-label">Hold Duration</span>
+                  <span id="liveDuration" class="live-math-val">-</span>
+                </div>
+                <div class="live-math-item">
+                  <span class="live-math-label">Signal P&L</span>
+                  <span id="liveSignalPnl" class="live-math-val">$0.00</span>
+                </div>
+                <div class="live-math-item">
+                  <span class="live-math-label">Sig-Act P&L Diff</span>
+                  <span id="liveSignalDiff" class="live-math-val">$0.00</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Direction, Status and Intervention Toggle Row -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 24px; margin-bottom: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Direction</label>
+                <div class="toggle-btn-group">
+                  <button type="button" id="directionLongBtn" class="active">LONG</button>
+                  <button type="button" id="directionShortBtn">SHORT</button>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Trade Status</label>
+                <div class="toggle-btn-group">
+                  <button type="button" id="statusExecutedBtn" class="active">TAKEN</button>
+                  <button type="button" id="statusSkippedBtn">SKIPPED</button>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: flex-end;">
+                <div style="display: flex; align-items: center; gap: 8px; height: 38px;">
+                  <input type="checkbox" id="tradeHasIntervention" style="width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--accent);">
+                  <label for="tradeHasIntervention" style="cursor: pointer; margin-bottom: 0; font-size: 0.875rem; font-weight: 500;">Manual Intervention</label>
+                </div>
+              </div>
+              <div class="form-group" id="interventionActionGroup" style="margin-bottom: 0;">
+                <label for="tradeIntervention">Intervention Action</label>
+                <select id="tradeIntervention">
+                  <option value="early_profit">Early Exit (Profit Protect)</option>
+                  <option value="early_loss">Early Exit (Stop Loss Cut)</option>
+                  <option value="late_entry">Late Entry (Chased)</option>
+                  <option value="skipped_invalid">Skipped (Invalid Setup)</option>
+                  <option value="skipped_fear">Skipped (Fear/Hesitation)</option>
+                  <option value="manual_no_signal">Manual Entry (No Signal)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Symbol, Asset Class, Setup & Mistake -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 16px; margin-bottom: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="tradeAssetClass">Asset Class</label>
+                <select id="tradeAssetClass">
+                  <option value="stocks">Stocks</option>
+                  <option value="options">Options</option>
+                  <option value="futures">Futures</option>
+                  <option value="crypto">Crypto</option>
+                  <option value="forex">Forex</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="tradeSymbol">Ticker Symbol *</label>
+                <input type="text" id="tradeSymbol" placeholder="e.g. TSLA" required style="text-transform: uppercase;">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="tradeSetup">Setup Tag</label>
+                <input type="text" id="tradeSetup" placeholder="e.g. Bull Flag" list="setupsDatalist">
+                <datalist id="setupsDatalist"></datalist>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="tradeMistake">Behavioral Mistake</label>
+                <select id="tradeMistake">
+                  <option value="">None (Disciplined)</option>
+                  <option value="FOMO">FOMO / Chasing</option>
+                  <option value="Exited Early">Exited Early</option>
+                  <option value="Stop Loss Moved">Moved/Ignored Stop Loss</option>
+                  <option value="Over leveraged">Over-leveraged / Sized Too Big</option>
+                  <option value="Overtrading">Overtrading / Boredom</option>
+                  <option value="Counter Trend">Against Trend (Revenge)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Dates -->
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeEntryDateTime">Entry Date & Time *</label>
+                <input type="datetime-local" id="tradeEntryDateTime" required>
+              </div>
+              <div class="form-group">
+                <label for="tradeExitDateTime">Exit Date & Time *</label>
+                <input type="datetime-local" id="tradeExitDateTime" required>
+              </div>
+            </div>
+
+            <!-- Trade Numbers -->
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeEntryPrice">Entry Price *</label>
+                <input type="number" id="tradeEntryPrice" placeholder="0.00" step="any" min="0.00001" required>
+              </div>
+              <div class="form-group">
+                <label for="tradeExitPrice">Exit Price *</label>
+                <input type="number" id="tradeExitPrice" placeholder="0.00" step="any" min="0.00001" required>
+              </div>
+            </div>
+
+            <!-- Excursion (MFE/MAE) -->
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeMaxPrice">Max Price During Trade (MFE)</label>
+                <input type="number" id="tradeMaxPrice" placeholder="High price reached" step="any" min="0">
+              </div>
+              <div class="form-group">
+                <label for="tradeMinPrice">Min Price During Trade (MAE)</label>
+                <input type="number" id="tradeMinPrice" placeholder="Low price reached" step="any" min="0">
+              </div>
+            </div>
+
+            <!-- Size, Stop, Fees -->
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeQty">Quantity / Size *</label>
+                <input type="number" id="tradeQty" placeholder="0" step="any" min="0.00001" required>
+              </div>
+              <div class="form-group">
+                <label for="tradeStopLoss">Stop Loss (optional)</label>
+                <input type="number" id="tradeStopLoss" placeholder="0.00" step="any" min="0">
+              </div>
+            </div>
+
+             <div class="form-group" style="margin-bottom: 12px;">
+               <label for="tradeFees">Commissions & Fees ($)</label>
+               <input type="number" id="tradeFees" placeholder="0.00" step="0.01" min="0" value="0.00">
+             </div>
+
+             <!-- P&L Override Fields -->
+             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+               <input type="checkbox" id="overridePnlToggle" style="width: 16px; height: 16px; cursor: pointer;">
+               <label for="overridePnlToggle" style="margin-bottom: 0; font-size: 0.875rem; font-weight: 500; cursor: pointer; user-select: none;">
+                 Override P&L (Manual Entry)
+               </label>
+             </div>
+
+             <div id="manualPnlContainer" class="form-group hidden" style="margin-bottom: 16px;">
+               <label for="tradeManualPnl">Manual Net P&L ($) *</label>
+               <input type="number" id="tradeManualPnl" placeholder="e.g. 150.00" step="any">
+             </div>
+
+            <!-- Automation & Signals -->
+            <div class="form-section-header">
+              <i data-lucide="cpu" style="width: 14px; height: 14px;"></i>
+              Signal & Automation Comparison (Optional)
+            </div>
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeSignalEntryPrice">Signal Entry Price</label>
+                <input type="number" id="tradeSignalEntryPrice" placeholder="0.00" step="any" min="0">
+              </div>
+              <div class="form-group">
+                <label for="tradeSignalExitPrice">Signal Exit Price</label>
+                <input type="number" id="tradeSignalExitPrice" placeholder="0.00" step="any" min="0">
+              </div>
+            </div>
+
+            <!-- Text Fields -->
+            <div class="form-group">
+              <label for="tradeNotes">Trading Notes (Thesis/Context)</label>
+              <textarea id="tradeNotes" placeholder="Describe the market context, catalyst, order flow..." rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+              <label for="tradeLessons">Lessons & Reflection</label>
+              <textarea id="tradeLessons" placeholder="Reflect on execution, discipline, emotions, rules..." rows="2"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="tradeScreenshotUrl">Screenshot URL (external chart image)</label>
+              <input type="url" id="tradeScreenshotUrl" placeholder="https://image-hosting.com/chart.png">
+            </div>
+
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="cancelTradeBtn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" id="tradeSubmitBtn" class="btn btn-primary">Save Trade</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2. Settings Modal -->
+    <div id="settingsModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="bold">Journal Settings</h3>
+          <button id="closeSettingsBtn" class="btn-icon"><i data-lucide="x"></i></button>
+        </div>
+        <form id="settingsForm">
+          <div class="modal-body">
+            
+            <div class="form-group">
+              <label for="startingBalanceInput">Starting Capital Account Balance ($) *</label>
+              <input type="number" id="startingBalanceInput" placeholder="25000" step="any" required min="0">
+              <span class="muted" style="font-size: 0.75rem; margin-top: 4px;">Used as the baseline starting capital for total account growth metrics.</span>
+            </div>
+
+            <div class="form-group">
+              <label for="defaultFeesInput">Default Commissions per Trade ($)</label>
+              <input type="number" id="defaultFeesInput" placeholder="0.00" step="0.01" min="0">
+              <span class="muted" style="font-size: 0.75rem; margin-top: 4px;">Pre-populates the commissions and fees field on new trades.</span>
+            </div>
+
+            <!-- Storage Usage bar -->
+            <div class="storage-usage-container">
+              <span class="bold" style="font-size: 0.8125rem;">Local Storage Capacity</span>
+              <div class="storage-bar-bg" style="margin-top: 8px;">
+                <div id="storageUsageBar" class="storage-bar-progress"></div>
+              </div>
+              <span id="storageUsageLabel" class="muted" style="font-size: 0.75rem;">0.0 KB of 5 MB used</span>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid var(--border); margin: 24px 0;">
+
+            <div class="form-group">
+              <label style="color: var(--loss); font-weight: 700; text-transform: uppercase;">Danger Zone</label>
+              <span class="muted" style="font-size: 0.75rem; margin-bottom: 8px;">Erase active account history, remove account configurations, or clear the entire journal database.</span>
+              <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                <button type="button" id="clearCurrentAccountTradesBtn" class="btn btn-secondary" style="border-color: var(--loss); color: var(--loss); justify-content: flex-start;">
+                  <i data-lucide="eraser"></i> Clear Active Account Trades
+                </button>
+                <button type="button" id="deleteCurrentAccountBtn" class="btn btn-secondary" style="border-color: var(--loss); color: var(--loss); justify-content: flex-start;">
+                  <i data-lucide="user-x"></i> Delete Active Account Portfolio
+                </button>
+                <button type="button" id="dangerClearDataBtn" class="btn btn-danger" style="justify-content: flex-start;">
+                  <i data-lucide="trash-2"></i> Clear All Journal Data (Factory Reset)
+                </button>
+              </div>
+            </div>
+
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="cancelSettingsBtn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 3. Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 480px;">
+        <div class="modal-header">
+          <h3 class="bold"><i data-lucide="keyboard" style="vertical-align: text-bottom; margin-right: 6px; color: var(--accent);"></i> Keyboard Shortcuts</h3>
+          <button id="closeShortcutsBtn" class="btn-icon"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 20px; font-size: 0.875rem;">
+          <div style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+              <span class="bold"><kbd style="background: rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 6px; font-family: monospace; border: 1px solid rgba(255,255,255,0.15);">N</kbd></span>
+              <span class="muted">Add New Trade Log</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+              <span class="bold"><kbd style="background: rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 6px; font-family: monospace; border: 1px solid rgba(255,255,255,0.15);">?</kbd></span>
+              <span class="muted">Toggle Keyboard Shortcuts Guide</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+              <span class="bold"><kbd style="background: rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 6px; font-family: monospace; border: 1px solid rgba(255,255,255,0.15);">Esc</kbd></span>
+              <span class="muted">Close active modal or day panel</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span class="bold"><kbd style="background: rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 6px; font-family: monospace; border: 1px solid rgba(255,255,255,0.15);">Alt + 1</kbd> to <kbd style="background: rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 6px; font-family: monospace; border: 1px solid rgba(255,255,255,0.15);">6</kbd></span>
+              <span class="muted">Quickly switch tabs</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="closeShortcutsOkBtn" class="btn btn-primary" style="width: 100%;">Got It</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stacked Alert Notification Toasts -->
+    <div id="toastContainer" class="toast-container"></div>
+
+  </div>
+
+  <!-- Load script type module orchestrator -->
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
