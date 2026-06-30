@@ -646,8 +646,12 @@ class StateManager {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
+          let targetSheetName = workbook.SheetNames[0];
+          const tradesSheetName = workbook.SheetNames.find(name => name.trim().toLowerCase() === "trades");
+          if (tradesSheetName) {
+            targetSheetName = tradesSheetName;
+          }
+          const worksheet = workbook.Sheets[targetSheetName];
           const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
           
           if (jsonData.length <= 1) {
