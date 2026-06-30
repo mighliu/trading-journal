@@ -286,10 +286,40 @@ export function getDateRange(preset, baseDate = new Date()) {
   return { start, end };
 }
 
-export function normalizeDateTime(dateStr) {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "";
+export function normalizeDateTime(dateVal) {
+  if (dateVal === null || dateVal === undefined || dateVal === "") return "";
+  
+  let d;
+  if (dateVal instanceof Date) {
+    d = dateVal;
+  } else if (typeof dateVal === "number") {
+    if (dateVal > 10000000000) {
+      d = new Date(dateVal < 1000000000000 ? dateVal * 1000 : dateVal);
+    } else {
+      d = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
+    }
+  } else {
+    const str = String(dateVal).trim();
+    const num = Number(str);
+    if (str && !isNaN(num)) {
+      if (num > 10000000000) {
+        d = new Date(num < 1000000000000 ? num * 1000 : num);
+      } else {
+        d = new Date(Math.round((num - 25569) * 86400 * 1000));
+      }
+    } else {
+      const match = str.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+      if (match) {
+        const [_, y, m, day, h, min, s] = match;
+        d = new Date(parseInt(y), parseInt(m) - 1, parseInt(day), parseInt(h), parseInt(min), s ? parseInt(s) : 0);
+      } else {
+        d = new Date(str);
+      }
+    }
+  }
+
+  if (!d || isNaN(d.getTime())) return "";
+  
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
