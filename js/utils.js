@@ -115,7 +115,7 @@ export function calcPnlDiff(signalPnl, actualPnl) {
   return sPnl - aPnl;
 }
 
-export function calcRiskReward(trade) {
+export function calcRiskReward(trade, avgLoss = 100) {
   const entry = parseFloat(trade.entryPrice);
   const exit = parseFloat(trade.exitPrice);
   const qty = parseFloat(trade.qty) || 0;
@@ -139,12 +139,9 @@ export function calcRiskReward(trade) {
     }
   }
 
-  // 2. If no stop loss (or invalid risk), fallback to MAE as the risk proxy
+  // 2. If no stop loss (or invalid risk), fallback to average loss of the system as the 1R risk unit
   if (riskVal <= 0) {
-    const mae = calcMae(trade);
-    if (mae !== null && mae > 0) {
-      riskVal = mae;
-    }
+    riskVal = avgLoss;
   }
 
   if (riskVal <= 0) return null;

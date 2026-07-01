@@ -1908,6 +1908,11 @@ export function renderRMultipleChart(trades) {
   const rBest = document.getElementById("rBest");
   const rWorst = document.getElementById("rWorst");
 
+  const executedLosingTrades = trades.filter(t => t.status === "executed" && calcNetPnl(t) < 0);
+  const avgLoss = executedLosingTrades.length > 0 
+    ? executedLosingTrades.reduce((sum, t) => sum + Math.abs(calcNetPnl(t)), 0) / executedLosingTrades.length 
+    : 100;
+
   const rMultiples = [];
   const wins = [];
   const losses = [];
@@ -1924,7 +1929,7 @@ export function renderRMultipleChart(trades) {
 
   trades.forEach(t => {
     if (t.status === "skipped") return;
-    const rMult = calcRiskReward(t);
+    const rMult = calcRiskReward(t, avgLoss);
     if (rMult === null || isNaN(rMult)) return;
 
     rMultiples.push(rMult);

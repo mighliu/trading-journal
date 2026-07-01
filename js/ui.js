@@ -315,6 +315,11 @@ export function renderTradeLog(trades, page = 1) {
     return;
   }
 
+  const executedLosingTrades = filtered.filter(t => t.status === "executed" && calcNetPnl(t) < 0);
+  const avgLoss = executedLosingTrades.length > 0 
+    ? executedLosingTrades.reduce((sum, t) => sum + Math.abs(calcNetPnl(t)), 0) / executedLosingTrades.length 
+    : 100;
+
   // 2. Apply column sorting
   const sortedTrades = filtered.sort((a, b) => {
     let valA, valB;
@@ -325,8 +330,8 @@ export function renderTradeLog(trades, page = 1) {
       valA = calcPnlPercent(a);
       valB = calcPnlPercent(b);
     } else if (currentSortField === "riskReward") {
-      valA = calcRiskReward(a) || 0;
-      valB = calcRiskReward(b) || 0;
+      valA = calcRiskReward(a, avgLoss) || 0;
+      valB = calcRiskReward(b, avgLoss) || 0;
     } else if (currentSortField === "duration") {
       const durA = calcDuration(a.entryDateTime, a.exitDateTime);
       const durB = calcDuration(b.entryDateTime, b.exitDateTime);
@@ -352,7 +357,7 @@ export function renderTradeLog(trades, page = 1) {
     const tradeNumber = filtered.length - (startIdx + index);
     const netPnl = calcNetPnl(t);
     const pnlPercent = calcPnlPercent(t);
-    const rr = calcRiskReward(t);
+    const rr = calcRiskReward(t, avgLoss);
     const durObj = calcDuration(t.entryDateTime, t.exitDateTime);
 
     const tr = document.createElement("tr");
