@@ -2097,10 +2097,10 @@ export function renderTradeSequenceChart(trades) {
   const sequenceMap = calcDailySequence(trades);
   
   const buckets = [
-    { label: "1st Trade", pnl: 0, count: 0 },
-    { label: "2nd Trade", pnl: 0, count: 0 },
-    { label: "3rd Trade", pnl: 0, count: 0 },
-    { label: "4th+ Trade", pnl: 0, count: 0 }
+    { label: "1st Trade", pnl: 0, count: 0, wins: 0 },
+    { label: "2nd Trade", pnl: 0, count: 0, wins: 0 },
+    { label: "3rd Trade", pnl: 0, count: 0, wins: 0 },
+    { label: "4th+ Trade", pnl: 0, count: 0, wins: 0 }
   ];
 
   trades.forEach(t => {
@@ -2112,6 +2112,9 @@ export function renderTradeSequenceChart(trades) {
     const bucketIdx = Math.min(seq - 1, 3);
     buckets[bucketIdx].pnl += net;
     buckets[bucketIdx].count++;
+    if (net > 0) {
+      buckets[bucketIdx].wins++;
+    }
   });
 
   const totalSequences = buckets.reduce((sum, b) => sum + b.count, 0);
@@ -2121,35 +2124,63 @@ export function renderTradeSequenceChart(trades) {
   }
 
   const labels = buckets.map(b => b.label);
-  const data = buckets.map(b => b.pnl);
-  const colors = data.map(v => v >= 0 ? "rgba(16, 185, 129, 0.75)" : "rgba(239, 68, 68, 0.75)");
+  const pnlData = buckets.map(b => b.pnl);
+  const winRates = buckets.map(b => b.count > 0 ? parseFloat(((b.wins / b.count) * 100).toFixed(1)) : 0);
+  const colors = pnlData.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = pnlData.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
-    type: "bar",
     data: {
       labels: labels,
-      datasets: [{
-        label: "Total Net P&L",
-        data: data,
-        backgroundColor: colors,
-        borderColor: data.map(v => v >= 0 ? "var(--profit)" : "var(--loss)"),
-        borderWidth: 1.5,
-        borderRadius: 6
-      }]
+      datasets: [
+        {
+          type: "bar",
+          label: "Total Net P&L ($)",
+          data: pnlData,
+          backgroundColor: colors,
+          borderColor: borderColors,
+          borderWidth: 1.5,
+          borderRadius: 6,
+          yAxisID: "yPnl"
+        },
+        {
+          type: "line",
+          label: "Win Rate (%)",
+          data: winRates,
+          borderColor: "var(--accent)",
+          backgroundColor: "rgba(99, 102, 241, 0.1)",
+          borderWidth: 2.5,
+          tension: 0.2,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: "var(--accent)",
+          pointBorderColor: "#fff",
+          yAxisID: "yWinRate"
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: "top",
+          labels: { color: getTickColor(), boxWidth: 12 }
+        },
         tooltip: {
           backgroundColor: getTooltipBg(),
           callbacks: {
             label: function(context) {
               const idx = context.dataIndex;
               const b = buckets[idx];
-              return `Total P&L: $${b.pnl.toLocaleString(undefined, {minimumFractionDigits: 2})} (${b.count} trades)`;
+              const wr = b.count > 0 ? ((b.wins / b.count) * 100).toFixed(1) : 0;
+              return [
+                `Total P&L: $${b.pnl.toLocaleString(undefined, {minimumFractionDigits: 2})}`,
+                `Win Rate: ${wr}%`,
+                `Trades: ${b.count} (${b.wins} Wins, ${b.count - b.wins} Losses)`
+              ];
             }
           }
         }
@@ -2159,10 +2190,26 @@ export function renderTradeSequenceChart(trades) {
           grid: { display: false },
           ticks: { color: getTickColor() }
         },
-        y: {
+        yPnl: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Total P&L ($)", color: "#a1a1aa" },
           grid: { color: getGridColor() },
-          ticks: { color: getTickColor(),
+          ticks: {
+            color: getTickColor(),
             callback: function(value) { return `$${value.toLocaleString()}`; }
+          }
+        },
+        yWinRate: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "Win Rate (%)", color: "#a1a1aa" },
+          min: 0,
+          max: 100,
+          grid: { display: false },
+          ticks: {
+            color: getTickColor(),
+            callback: function(value) { return value + "%"; }
           }
         }
       }
