@@ -48,6 +48,25 @@ export function getSymbolMultiplier(symbol, assetClass = "") {
   return 1;
 }
 
+export function getEffectiveMultiplier(trade) {
+  if (!trade) return 1;
+  const qty = parseFloat(trade.qty) || 0;
+  const entry = parseFloat(trade.entryPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || 0;
+  const fees = parseFloat(trade.fees) || 0;
+  const directionMultiplier = trade.direction === "short" ? -1 : 1;
+  
+  let multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
+  if (trade.overridePnl && trade.manualPnl != null) {
+    const manualPnl = parseFloat(trade.manualPnl) || 0;
+    const priceDiff = (exit - entry) * directionMultiplier;
+    if (!isNaN(priceDiff) && priceDiff !== 0 && qty > 0) {
+      multiplier = Math.abs((manualPnl + fees) / (priceDiff * qty));
+    }
+  }
+  return multiplier;
+}
+
 export function calcNetPnl(trade) {
   if (trade.status === "skipped") return 0;
   if (trade.overridePnl && trade.manualPnl != null) {
@@ -77,14 +96,7 @@ export function calcSignalPnl(trade) {
   const directionMultiplier = trade.direction === "long" ? 1 : -1;
   const fees = parseFloat(trade.fees) || 0;
 
-  let multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
-  if (trade.overridePnl && trade.manualPnl != null) {
-    const manualPnl = parseFloat(trade.manualPnl) || 0;
-    const priceDiff = (trade.exitPrice - trade.entryPrice) * directionMultiplier;
-    if (!isNaN(priceDiff) && priceDiff !== 0 && qty > 0) {
-      multiplier = Math.abs((manualPnl + fees) / (priceDiff * qty));
-    }
-  }
+  let multiplier = getEffectiveMultiplier(trade);
 
   return (exit - entry) * qty * multiplier * directionMultiplier - fees;
 }
@@ -674,7 +686,7 @@ export function calcMfe(trade) {
   const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
   
-  const mult = getSymbolMultiplier(trade.symbol, trade.assetClass);
+  const mult = getEffectiveMultiplier(trade);
   
   if (trade.direction === "long") {
     if (!trade.maxPrice) return null;
@@ -698,7 +710,7 @@ export function calcMae(trade) {
   const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
   
-  const mult = getSymbolMultiplier(trade.symbol, trade.assetClass);
+  const mult = getEffectiveMultiplier(trade);
   
   if (trade.direction === "long") {
     if (!trade.minPrice) return null;
