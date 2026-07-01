@@ -1756,7 +1756,27 @@ export function renderMfeMaeCharts(trades) {
                 label: function(context) {
                   const p = context.raw;
                   const numStr = p.tradeNo ? `Trade #${p.tradeNo} ` : "";
-                  return `${numStr}(${p.symbol}): MFE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+                  const mfe = p.x;
+                  const pnl = p.y;
+                  const lines = [];
+                  
+                  lines.push(`${numStr}(${p.symbol})`);
+                  lines.push(`MFE (Peak Profit): $${mfe.toLocaleString(undefined, {minimumFractionDigits:2})}`);
+                  lines.push(`Realized P&L: $${pnl.toLocaleString(undefined, {minimumFractionDigits:2})}`);
+                  lines.push(`------------------------`);
+                  
+                  if (pnl >= 0) {
+                    const capturedPct = mfe > 0 ? (pnl / mfe) * 100 : 0;
+                    const leftPct = 100 - capturedPct;
+                    const leftDollar = mfe - pnl;
+                    lines.push(`Captured: ${capturedPct.toFixed(1)}% ($${pnl.toLocaleString(undefined, {minimumFractionDigits:2})})`);
+                    lines.push(`Left on Table: ${leftPct.toFixed(1)}% ($${leftDollar.toLocaleString(undefined, {minimumFractionDigits:2})})`);
+                  } else {
+                    lines.push(`Captured: 0.0% ($0.00)`);
+                    lines.push(`Left on Table: $${mfe.toLocaleString(undefined, {minimumFractionDigits:2})} (100% of peak)`);
+                  }
+                  
+                  return lines;
                 }
               }
             }
@@ -1827,7 +1847,28 @@ export function renderMfeMaeCharts(trades) {
                 label: function(context) {
                   const p = context.raw;
                   const numStr = p.tradeNo ? `Trade #${p.tradeNo} ` : "";
-                  return `${numStr}(${p.symbol}): MAE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+                  const mae = p.x;
+                  const pnl = p.y;
+                  const lines = [];
+                  
+                  lines.push(`${numStr}(${p.symbol})`);
+                  lines.push(`MAE (Max Drawdown): $${mae.toLocaleString(undefined, {minimumFractionDigits:2})}`);
+                  lines.push(`Realized P&L: $${pnl.toLocaleString(undefined, {minimumFractionDigits:2})}`);
+                  lines.push(`------------------------`);
+                  
+                  if (pnl < 0) {
+                    const lossSuffered = Math.abs(pnl);
+                    const sufferedPct = mae > 0 ? (lossSuffered / mae) * 100 : 0;
+                    const savedPct = 100 - sufferedPct;
+                    const savedDollar = mae - lossSuffered;
+                    lines.push(`Loss Suffered: ${sufferedPct.toFixed(1)}% ($${lossSuffered.toLocaleString(undefined, {minimumFractionDigits:2})})`);
+                    lines.push(`Saved from Max: ${savedPct.toFixed(1)}% ($${savedDollar.toLocaleString(undefined, {minimumFractionDigits:2})})`);
+                  } else {
+                    lines.push(`Loss Suffered: 0.0% ($0.00)`);
+                    lines.push(`Saved from Max: 100.0% ($${mae.toLocaleString(undefined, {minimumFractionDigits:2})})`);
+                  }
+                  
+                  return lines;
                 }
               }
             }
