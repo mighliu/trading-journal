@@ -50,8 +50,6 @@ export function renderStatsBanner(trades, startingBalance = 25000) {
   const bannerMaxDrawdown = document.getElementById("bannerMaxDrawdown");
   const bannerRecoveryFactor = document.getElementById("bannerRecoveryFactor");
 
-  if (!bannerPnl) return;
-
   // Computations
   let totalNetPnl = 0;
   let grossWins = 0;
@@ -82,46 +80,63 @@ export function renderStatsBanner(trades, startingBalance = 25000) {
   const streaks = calcStreaks(trades);
 
   // Render values
-  bannerPnl.textContent = formatCurrency(totalNetPnl);
-  bannerPnl.className = `stat-value ${totalNetPnl > 0 ? "profit" : totalNetPnl < 0 ? "loss" : ""}`;
+  if (bannerPnl) {
+    const pnlSign = totalNetPnl > 0 ? "+" : "";
+    bannerPnl.textContent = `${pnlSign}${formatCurrency(totalNetPnl)} (${formatPercent(growthPercent)})`;
+    bannerPnl.className = `stat-value ${totalNetPnl > 0 ? "profit" : totalNetPnl < 0 ? "loss" : ""}`;
 
-  // Apply glow to the P&L card container
-  const pnlCard = bannerPnl.closest('.stat-card');
-  if (pnlCard) {
-    pnlCard.classList.remove('card-profit', 'card-loss');
-    if (totalNetPnl > 0) pnlCard.classList.add('card-profit');
-    else if (totalNetPnl < 0) pnlCard.classList.add('card-loss');
+    // Apply TradingView-style theme colors and glow to the Net Profit card container
+    const pnlCard = bannerPnl.closest('.stat-card');
+    if (pnlCard) {
+      pnlCard.classList.remove('card-tv-profit', 'card-tv-loss', 'card-profit', 'card-loss');
+      if (totalNetPnl > 0) pnlCard.classList.add('card-tv-profit');
+      else if (totalNetPnl < 0) pnlCard.classList.add('card-tv-loss');
+    }
   }
   
-  bannerBalance.textContent = formatCurrency(finalBalance);
+  if (bannerBalance) {
+    bannerBalance.textContent = formatCurrency(finalBalance);
+  }
   
-  bannerGrowth.textContent = formatPercent(growthPercent);
-  bannerGrowth.className = `stat-value ${growthPercent > 0 ? "profit" : growthPercent < 0 ? "loss" : ""}`;
+  if (bannerGrowth) {
+    bannerGrowth.textContent = formatPercent(growthPercent);
+    bannerGrowth.className = `stat-value ${growthPercent > 0 ? "profit" : growthPercent < 0 ? "loss" : ""}`;
+  }
   
-  bannerWinRate.textContent = `${winRate.toFixed(1)}%`;
+  if (bannerWinRate) {
+    bannerWinRate.textContent = `${winRate.toFixed(1)}%`;
+  }
   if (bannerWinRateProgress) {
     bannerWinRateProgress.style.strokeDasharray = `${winRate}, 100`;
   }
 
-  bannerProfitFactor.textContent = profitFactor === 99.9 ? "∞" : profitFactor.toFixed(2);
-  bannerProfitFactor.className = `stat-value ${profitFactor >= 1.5 ? "profit" : profitFactor < 1 ? "loss" : ""}`;
+  if (bannerProfitFactor) {
+    bannerProfitFactor.textContent = profitFactor === 99.9 ? "∞" : profitFactor.toFixed(2);
+    bannerProfitFactor.className = `stat-value ${profitFactor >= 1.5 ? "profit" : profitFactor < 1 ? "loss" : ""}`;
+  }
 
-  bannerAvgWinLoss.textContent = `${formatCurrency(avgWin)} / ${formatCurrency(avgLoss)}`;
+  if (bannerAvgWinLoss) {
+    bannerAvgWinLoss.textContent = `${formatCurrency(avgWin)} / ${formatCurrency(avgLoss)}`;
+  }
   
-  bannerBestStreak.textContent = `🔥 ${streaks.bestWinStreak}`;
+  if (bannerBestStreak) {
+    bannerBestStreak.textContent = `🔥 ${streaks.bestWinStreak}`;
+  }
   
-  bannerCurrentStreak.textContent = streaks.currentStreak;
-  if (streaks.currentStreak.startsWith("W")) {
-    bannerCurrentStreak.className = "stat-value profit";
-  } else if (streaks.currentStreak.startsWith("L")) {
-    bannerCurrentStreak.className = "stat-value loss";
-  } else {
-    bannerCurrentStreak.className = "stat-value";
+  if (bannerCurrentStreak) {
+    bannerCurrentStreak.textContent = streaks.currentStreak;
+    if (streaks.currentStreak.startsWith("W")) {
+      bannerCurrentStreak.className = "stat-value profit";
+    } else if (streaks.currentStreak.startsWith("L")) {
+      bannerCurrentStreak.className = "stat-value loss";
+    } else {
+      bannerCurrentStreak.className = "stat-value";
+    }
   }
 
   // Calculate Sharpe and Sortino
-  const sharpe = calcSharpeRatio(trades);
-  const sortino = calcSortinoRatio(trades);
+  const sharpe = calcSharpeRatio(trades, startingBalance);
+  const sortino = calcSortinoRatio(trades, startingBalance);
 
   if (bannerSharpe) {
     bannerSharpe.textContent = sharpe === 99.9 ? "∞" : sharpe.toFixed(2);
@@ -196,6 +211,67 @@ export function renderStatsBanner(trades, startingBalance = 25000) {
   const globalCount = document.getElementById("globalTradeCount");
   if (globalCount) {
     globalCount.textContent = trades.length;
+  }
+
+  // Update new TradingView-style Performance Summary table
+  const tvNetProfit = document.getElementById("tvNetProfitValue");
+  const tvGrossProfit = document.getElementById("tvGrossProfitValue");
+  const tvGrossLoss = document.getElementById("tvGrossLossValue");
+  const tvProfitFactor = document.getElementById("tvProfitFactorValue");
+  const tvMaxDrawdown = document.getElementById("tvMaxDrawdownValue");
+  const tvSharpe = document.getElementById("tvSharpeRatioValue");
+  const tvSortino = document.getElementById("tvSortinoRatioValue");
+  const tvTotalTrades = document.getElementById("tvTotalTradesValue");
+  const tvWinRate = document.getElementById("tvWinRateValue");
+  const tvAverageTrade = document.getElementById("tvAverageTradeValue");
+  const tvAvgWinLossRatio = document.getElementById("tvAvgWinLossRatioValue");
+
+  if (tvNetProfit) {
+    const pnlSign = totalNetPnl > 0 ? "+" : "";
+    tvNetProfit.textContent = `${pnlSign}${formatCurrency(totalNetPnl)} (${formatPercent(growthPercent)})`;
+    tvNetProfit.className = totalNetPnl > 0 ? "profit" : totalNetPnl < 0 ? "loss" : "";
+  }
+  if (tvGrossProfit) {
+    tvGrossProfit.textContent = formatCurrency(grossWins);
+    tvGrossProfit.className = grossWins > 0 ? "profit" : "";
+  }
+  if (tvGrossLoss) {
+    tvGrossLoss.textContent = formatCurrency(-grossLosses);
+    tvGrossLoss.className = grossLosses > 0 ? "loss" : "";
+  }
+  if (tvProfitFactor) {
+    tvProfitFactor.textContent = profitFactor === 99.9 ? "∞" : profitFactor.toFixed(2);
+  }
+  if (tvMaxDrawdown) {
+    if (mdd.amount > 0) {
+      tvMaxDrawdown.textContent = `${formatCurrency(-mdd.amount)} (-${mdd.percent.toFixed(2)}%)`;
+      tvMaxDrawdown.className = "loss";
+    } else {
+      tvMaxDrawdown.textContent = "$0.00 (0.00%)";
+      tvMaxDrawdown.className = "";
+    }
+  }
+  if (tvSharpe) {
+    tvSharpe.textContent = sharpe === 99.9 ? "∞" : sharpe.toFixed(2);
+    tvSharpe.className = sharpe >= 1.5 ? "profit" : sharpe < 0 ? "loss" : "";
+  }
+  if (tvSortino) {
+    tvSortino.textContent = sortino === 99.9 ? "∞" : sortino.toFixed(2);
+    tvSortino.className = sortino >= 1.5 ? "profit" : sortino < 0 ? "loss" : "";
+  }
+  if (tvTotalTrades) {
+    tvTotalTrades.textContent = trades.length;
+  }
+  if (tvWinRate) {
+    tvWinRate.textContent = `${winRate.toFixed(1)}%`;
+  }
+  if (tvAverageTrade) {
+    tvAverageTrade.textContent = formatCurrency(expectancy);
+    tvAverageTrade.className = expectancy > 0 ? "profit" : expectancy < 0 ? "loss" : "";
+  }
+  if (tvAvgWinLossRatio) {
+    const ratio = avgLoss > 0 ? (avgWin / avgLoss) : (avgWin > 0 ? 99.9 : 0);
+    tvAvgWinLossRatio.textContent = ratio === 99.9 ? "∞" : ratio.toFixed(2);
   }
 }
 
@@ -290,6 +366,29 @@ export function renderTradeLog(trades, page = 1) {
       year: "2-digit"
     });
 
+    let slippageIcon = "";
+    const hasSigEntry = t.signalEntryPrice !== null && t.signalEntryPrice !== undefined && t.signalEntryPrice !== "";
+    const hasSigExit = t.signalExitPrice !== null && t.signalExitPrice !== undefined && t.signalExitPrice !== "";
+    if (hasSigEntry || hasSigExit) {
+      const sigEntry = hasSigEntry ? parseFloat(t.signalEntryPrice) : t.entryPrice;
+      const sigExit = hasSigExit ? parseFloat(t.signalExitPrice) : t.exitPrice;
+      const actEntry = t.entryPrice;
+      const actExit = t.exitPrice;
+
+      let entrySlippage = t.direction === "long" ? sigEntry - actEntry : actEntry - sigEntry;
+      let exitSlippage = t.direction === "long" ? actExit - sigExit : sigExit - actExit;
+
+      if ((hasSigEntry && entrySlippage < -0.01) || (hasSigExit && exitSlippage < -0.01)) {
+        const actPnl = calcNetPnl(t);
+        const sigPnl = calcSignalPnl(t);
+        const totalSlippageDollar = actPnl - sigPnl;
+        
+        if (totalSlippageDollar < -0.01) {
+          slippageIcon = ` <span class="slippage-warn-icon tooltip-trigger" data-tooltip="Negative slippage detected: ${formatCurrency(totalSlippageDollar)} (Worse execution than signal)"><i data-lucide="alert-triangle" style="width: 13px; height: 13px; color: #fbbf24; margin-left: 4px; vertical-align: middle;"></i></span>`;
+        }
+      }
+    }
+
     const escapedSymbol = escapeHtml(t.symbol);
     const escapedSetup = escapeHtml(t.setup);
     const escapedNotes = escapeHtml(t.notes);
@@ -300,7 +399,7 @@ export function renderTradeLog(trades, page = 1) {
       <td><i data-lucide="chevron-right" class="row-expand-icon"></i></td>
       <td style="text-align: center; color: var(--text-secondary); font-size: 0.8125rem;">${tradeNumber}</td>
       <td>${dateFormatted}</td>
-      <td class="bold">${escapedSymbol}</td>
+      <td class="bold">${escapedSymbol}${slippageIcon}</td>
       <td><span class="badge direction-${t.direction}">${t.direction.toUpperCase()}</span></td>
       <td>${t.qty}</td>
       <td>$${t.entryPrice.toFixed(2)}</td>
@@ -324,7 +423,8 @@ export function renderTradeLog(trades, page = 1) {
     trDetail.id = `detail-${t.id}`;
     
     let screenshotMarkup = "";
-    if (t.screenshotUrl) {
+    const isSafeScreenshotUrl = t.screenshotUrl && (t.screenshotUrl.startsWith("http://") || t.screenshotUrl.startsWith("https://"));
+    if (isSafeScreenshotUrl) {
       screenshotMarkup = `
         <div class="detail-screenshot-box">
           <span class="detail-label">Screenshot</span>
@@ -450,7 +550,11 @@ export function renderTradeLog(trades, page = 1) {
   });
 
   // Render Lucide icons in table
-  lucide.createIcons();
+  lucide.createIcons({
+    attrs: { class: "lucide" },
+    nameAttr: "data-lucide",
+    root: tbody
+  });
 
   // Render pagination controls
   renderPagination(totalPages, currentPage, paginationContainer);
@@ -894,6 +998,20 @@ export function setupUIListeners() {
   if (settingsBtn) settingsBtn.addEventListener("click", openSettingsModal);
   if (closeSettingsBtn) closeSettingsBtn.addEventListener("click", closeSettingsModal);
   if (cancelSettingsBtn) cancelSettingsBtn.addEventListener("click", closeSettingsModal);
+
+  // Overlay click logic (close modal when clicking outside)
+  const addTradeModal = document.getElementById("addTradeModal");
+  const settingsModal = document.getElementById("settingsModal");
+  if (addTradeModal) {
+    addTradeModal.addEventListener("click", (e) => {
+      if (e.target === addTradeModal) closeTradeModal();
+    });
+  }
+  if (settingsModal) {
+    settingsModal.addEventListener("click", (e) => {
+      if (e.target === settingsModal) closeSettingsModal();
+    });
+  }
 
   // Account Switcher selector
   const accountSelector = document.getElementById("accountSelector");

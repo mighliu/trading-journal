@@ -108,20 +108,15 @@
       
       <!-- Stats Banner (Horizontal Row of 8 Cards) -->
       <section class="stats-banner">
-        <!-- Net P&L Card -->
+        <!-- Net Profit Card (TradingView Style) -->
         <div class="stat-card">
-          <span class="stat-label">Net P&L <i data-lucide="wallet" style="width: 12px; height: 12px;"></i></span>
-          <span id="bannerPnl" class="stat-value">$0.00</span>
+          <span class="stat-label">Net Profit <i data-lucide="wallet" style="width: 12px; height: 12px;"></i></span>
+          <span id="bannerPnl" class="stat-value">$0.00 (0.00%)</span>
         </div>
         <!-- Balance Card -->
         <div class="stat-card">
           <span class="stat-label">Account Balance <i data-lucide="banknote" style="width: 12px; height: 12px;"></i></span>
           <span id="bannerBalance" class="stat-value">$25,000.00</span>
-        </div>
-        <!-- Growth Card -->
-        <div class="stat-card">
-          <span class="stat-label">Growth <i data-lucide="percent" style="width: 12px; height: 12px;"></i></span>
-          <span id="bannerGrowth" class="stat-value">0.00%</span>
         </div>
         <!-- Win Rate Card -->
         <div class="stat-card">
@@ -165,7 +160,7 @@
         <div class="stat-card">
           <span class="stat-label">
             Sharpe Ratio
-            <span class="tooltip-trigger" data-tooltip="Measures return consistency by comparing your average trade outcome against its deviation (variance). Higher is better.">
+            <span class="tooltip-trigger" data-tooltip="Annualized Sharpe ratio using daily equity returns (including zero-return weekdays). Higher is better.">
               <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
             </span>
           </span>
@@ -175,7 +170,7 @@
         <div class="stat-card">
           <span class="stat-label">
             Sortino Ratio
-            <span class="tooltip-trigger" data-tooltip="Similar to Sharpe, but only penalizes downside volatility (losses), measuring your protection against disadvantageous trades.">
+            <span class="tooltip-trigger" data-tooltip="Annualized Sortino ratio using daily equity returns, penalizing only downside volatility (losses).">
               <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
             </span>
           </span>
@@ -326,6 +321,64 @@
             </div>
           </div>
         </div>
+
+        <!-- Performance Summary Card (TradingView Style) -->
+        <div class="chart-card chart-card-full" style="margin-top: 24px;">
+          <div class="chart-header">
+            <h3 class="chart-title"><i data-lucide="sheet" style="color: var(--accent)"></i> Performance Summary</h3>
+            <span class="muted" style="font-size: 0.75rem;">TradingView Strategy Tester Style</span>
+          </div>
+          <div class="tv-summary-table-wrapper">
+            <table class="tv-summary-table">
+              <tbody>
+                <tr>
+                  <td>Net Profit</td>
+                  <td id="tvNetProfitValue">$0.00 (0.00%)</td>
+                </tr>
+                <tr>
+                  <td>Gross Profit</td>
+                  <td id="tvGrossProfitValue">$0.00</td>
+                </tr>
+                <tr>
+                  <td>Gross Loss</td>
+                  <td id="tvGrossLossValue">$0.00</td>
+                </tr>
+                <tr>
+                  <td>Profit Factor</td>
+                  <td id="tvProfitFactorValue">0.00</td>
+                </tr>
+                <tr>
+                  <td>Max Drawdown</td>
+                  <td id="tvMaxDrawdownValue">$0.00 (0.00%)</td>
+                </tr>
+                <tr>
+                  <td>Sharpe Ratio</td>
+                  <td id="tvSharpeRatioValue">0.00</td>
+                </tr>
+                <tr>
+                  <td>Sortino Ratio</td>
+                  <td id="tvSortinoRatioValue">0.00</td>
+                </tr>
+                <tr>
+                  <td>Total Closed Trades</td>
+                  <td id="tvTotalTradesValue">0</td>
+                </tr>
+                <tr>
+                  <td>Win Rate</td>
+                  <td id="tvWinRateValue">0.0%</td>
+                </tr>
+                <tr>
+                  <td>Average Trade</td>
+                  <td id="tvAverageTradeValue">$0.00</td>
+                </tr>
+                <tr>
+                  <td>Avg Win / Avg Loss Ratio</td>
+                  <td id="tvAvgWinLossRatioValue">0.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- ==================== TAB CONTENT: TRADE LOG ==================== -->
@@ -427,7 +480,7 @@
           <!-- Day of week P&L -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="calendar-days"></i> P&L by Day of the Week</h3>
+              <h3 class="chart-title"><i data-lucide="calendar-days"></i> P&L by Day of the Week <span class="tooltip-trigger" data-tooltip="Shows your net P&L accumulated on each day of the week to analyze which days are most profitable."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="dayOfWeekChart"></canvas>
@@ -436,7 +489,7 @@
           <!-- Performance by Setup -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="tag"></i> P&L by Setup Tag</h3>
+              <h3 class="chart-title"><i data-lucide="tag"></i> P&L by Setup Tag <span class="tooltip-trigger" data-tooltip="Ranks setups by net performance to identify your high-expectancy setups."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="setupTagChart"></canvas>
@@ -445,7 +498,7 @@
           <!-- Performance by Asset Class -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="layers" style="color: var(--accent)"></i> P&L by Asset Class</h3>
+              <h3 class="chart-title"><i data-lucide="layers" style="color: var(--accent)"></i> P&L by Asset Class <span class="tooltip-trigger" data-tooltip="Compares net performance across Stocks, Options, Futures, Crypto, and Forex."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="assetClassChart"></canvas>
@@ -454,7 +507,7 @@
           <!-- Win Rate by Symbol -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="bar-chart-3"></i> Top Symbols (Volume vs Win Rate)</h3>
+              <h3 class="chart-title"><i data-lucide="bar-chart-3"></i> Top Symbols (Volume vs Win Rate) <span class="tooltip-trigger" data-tooltip="Plots your most traded symbols: total trade count (bars) and their respective win rates (line)."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="symbolChart"></canvas>
@@ -463,7 +516,7 @@
           <!-- Mistakes Distribution -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="skull" style="color: var(--loss)"></i> P&L by Behavioral Mistake</h3>
+              <h3 class="chart-title"><i data-lucide="skull" style="color: var(--loss)"></i> P&L by Behavioral Mistake <span class="tooltip-trigger" data-tooltip="Tracks the net financial impact of psychological mistakes (e.g. FOMO, Revenge Trading)."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="mistakeChart"></canvas>
@@ -472,7 +525,7 @@
           <!-- Slippage by Ticker -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="shuffle" style="color: #fbbf24"></i> Execution Slippage by Symbol</h3>
+              <h3 class="chart-title"><i data-lucide="shuffle" style="color: #fbbf24"></i> Execution Slippage by Symbol <span class="tooltip-trigger" data-tooltip="Measures cumulative execution slippage (Actual P&L minus Signal P&L) per symbol. Positive indicates outperformance."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="slippageSymbolChart"></canvas>
@@ -481,7 +534,7 @@
           <!-- Hourly Performance -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="clock" style="color: var(--accent)"></i> Net P&L by Hour of Entry</h3>
+              <h3 class="chart-title"><i data-lucide="clock" style="color: var(--accent)"></i> Net P&L by Hour of Entry <span class="tooltip-trigger" data-tooltip="Distributes net P&L by the hour of entry to locate your peak operating hours during the day."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="hourPnlChart"></canvas>
@@ -490,7 +543,7 @@
           <!-- Win/Loss Size Distribution -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="bar-chart" style="color: #10b981"></i> Win/Loss Size Distribution</h3>
+              <h3 class="chart-title"><i data-lucide="bar-chart" style="color: #10b981"></i> Win/Loss Size Distribution <span class="tooltip-trigger" data-tooltip="Groups trade outcomes into size ranges to check if you are keeping losses small and letting wins run."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="distributionChart"></canvas>
@@ -499,7 +552,7 @@
           <!-- Cumulative Slippage Trend -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="trending-up" style="color: #3b82f6"></i> Cumulative Execution Slippage Curve</h3>
+              <h3 class="chart-title"><i data-lucide="trending-up" style="color: #3b82f6"></i> Cumulative Execution Slippage Curve <span class="tooltip-trigger" data-tooltip="Plots cumulative execution slippage over time. An upward trend represents positive/favorable execution fills."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="cumulativeSlippageChart"></canvas>
@@ -508,7 +561,7 @@
           <!-- Hold Time Performance -->
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="hourglass" style="color: #fbbf24"></i> Performance by Hold Time</h3>
+              <h3 class="chart-title"><i data-lucide="hourglass" style="color: #fbbf24"></i> Performance by Hold Time <span class="tooltip-trigger" data-tooltip="Groups trade outcomes by holding duration (e.g. under 5m, 30m, 2h) to evaluate trade duration expectancy."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium">
               <canvas id="holdTimeChart"></canvas>
@@ -736,7 +789,7 @@
         <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="flame" style="color: #ef4444"></i> Post-Loss Behavioral Matrix</h3>
+              <h3 class="chart-title"><i data-lucide="flame" style="color: #ef4444"></i> Post-Loss Behavioral Matrix <span class="tooltip-trigger" data-tooltip="Compares win rates and average profits for trades executed immediately after a win vs. after a loss to diagnose revenge trading."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium" style="height: 280px;">
               <canvas id="postLossBehaviorChart"></canvas>
@@ -745,7 +798,7 @@
 
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="activity" style="color: #a78bfa"></i> Rolling 20-Trade Metrics</h3>
+              <h3 class="chart-title"><i data-lucide="activity" style="color: #a78bfa"></i> Rolling 20-Trade Metrics <span class="tooltip-trigger" data-tooltip="Plots a rolling 20-trade win rate (line) and profit factor (bars) to evaluate consistency trends over time."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium" style="height: 280px;">
               <canvas id="rollingPerformanceChart"></canvas>
@@ -756,7 +809,7 @@
         <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="bar-chart-3" style="color: #fbbf24"></i> R-Multiple Distribution</h3>
+              <h3 class="chart-title"><i data-lucide="bar-chart-3" style="color: #fbbf24"></i> R-Multiple Distribution <span class="tooltip-trigger" data-tooltip="Histograms showing outcomes binned by their Risk-to-Reward multiple (R). Indicates if you maintain positive reward-to-risk sizing."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium" style="height: 280px;">
               <canvas id="rMultipleChart"></canvas>
@@ -765,7 +818,7 @@
 
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="git-commit" style="color: #34d399"></i> P&L by Daily Sequence</h3>
+              <h3 class="chart-title"><i data-lucide="git-commit" style="color: #34d399"></i> P&L by Daily Sequence <span class="tooltip-trigger" data-tooltip="Bar chart grouping trade performance by their order of entry during the day (1st, 2nd, etc.) to evaluate fatigue or overtrading."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium" style="height: 280px;">
               <canvas id="tradeSequenceChart"></canvas>
@@ -776,7 +829,7 @@
         <div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="maximize-2" style="color: #34d399"></i> MFE (Maximum Favorable Excursion) vs Realized P&L</h3>
+              <h3 class="chart-title"><i data-lucide="maximize-2" style="color: #34d399"></i> MFE (Maximum Favorable Excursion) vs Realized P&L <span class="tooltip-trigger" data-tooltip="Compares the maximum potential run-up of a trade against its final P&L to highlight exit efficiency and money left on the table."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium" style="height: 250px;">
               <canvas id="mfeScatterChart"></canvas>
@@ -785,7 +838,7 @@
 
           <div class="chart-card">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="minimize-2" style="color: #ef4444"></i> MAE (Maximum Adverse Excursion) vs Realized P&L</h3>
+              <h3 class="chart-title"><i data-lucide="minimize-2" style="color: #ef4444"></i> MAE (Maximum Adverse Excursion) vs Realized P&L <span class="tooltip-trigger" data-tooltip="Compares the maximum drawdown hit during a trade against its final outcome to identify if stop losses are too tight or ignored."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium" style="height: 250px;">
               <canvas id="maeScatterChart"></canvas>
@@ -796,7 +849,7 @@
         <!-- Full Width: Timeline Replay / Day Timeline view -->
         <div class="chart-card" style="margin-bottom: 24px;">
           <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <h3 class="chart-title"><i data-lucide="clock" style="color: #60a5fa"></i> Intraday Trade Replay Timeline</h3>
+            <h3 class="chart-title"><i data-lucide="clock" style="color: #60a5fa"></i> Intraday Trade Replay Timeline <span class="tooltip-trigger" data-tooltip="Displays a chronological overlay timeline of trades taken during the selected day, visualizing holding periods and position overlaps."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             <div style="display: flex; align-items: center; gap: 8px;">
               <span class="muted" style="font-size: 0.75rem;">Select Replay Day:</span>
               <select id="replayDateSelect" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; height: 28px; background-color: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer; outline: none;"></select>

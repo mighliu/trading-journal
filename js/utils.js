@@ -75,8 +75,17 @@ export function calcSignalPnl(trade) {
   const signalExit = parseFloat(trade.signalExitPrice);
   const exit = !isNaN(signalExit) ? signalExit : (parseFloat(trade.exitPrice) || 0);
   const directionMultiplier = trade.direction === "long" ? 1 : -1;
-  const multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
   const fees = parseFloat(trade.fees) || 0;
+
+  let multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
+  if (trade.overridePnl && trade.manualPnl != null) {
+    const manualPnl = parseFloat(trade.manualPnl) || 0;
+    const priceDiff = (trade.exitPrice - trade.entryPrice) * directionMultiplier;
+    if (!isNaN(priceDiff) && priceDiff !== 0 && qty > 0) {
+      multiplier = Math.abs((manualPnl + fees) / (priceDiff * qty));
+    }
+  }
+
   return (exit - entry) * qty * multiplier * directionMultiplier - fees;
 }
 
@@ -111,7 +120,13 @@ export function calcRiskReward(trade) {
   if (riskPerUnit <= 0) return null;
   
   if (trade.overridePnl && trade.manualPnl != null) {
-    const multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
+    let multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
+    const directionMultiplier = trade.direction === "long" ? 1 : -1;
+    const priceDiff = (trade.exitPrice - trade.entryPrice) * directionMultiplier;
+    const fees = parseFloat(trade.fees) || 0;
+    if (!isNaN(priceDiff) && priceDiff !== 0 && qty > 0) {
+      multiplier = Math.abs((parseFloat(trade.manualPnl) + fees) / (priceDiff * qty));
+    }
     const riskVal = riskPerUnit * qty * multiplier;
     if (riskVal <= 0) return null;
     return calcNetPnl(trade) / riskVal;
@@ -324,30 +339,72 @@ export function normalizeDateTime(dateVal) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function calcSharpeRatio(trades) {
-  if (trades.length < 2) return 0;
-  const pnls = trades.map(t => calcNetPnl(t));
-  const mean = pnls.reduce((sum, val) => sum + val, 0) / pnls.length;
-  
-  const variance = pnls.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / (pnls.length - 1);
-  const stdDev = Math.sqrt(variance);
-  
-  if (stdDev === 0) return 0;
-  return mean / stdDev;
+function getDailyReturns(trades, startingBalance = 25000) {
+  const sorted = [...trades].filter(t => t.status !== "skipped" && t.exitDateTime)
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+  if (sorted.length === 0) return [];
+
+  const dailyPnlMap = {};
+  let minDate = null;
+  let maxDate = null;
+
+  for (const t of sorted) {
+    const day = t.exitDateTime.split("T")[0];
+    dailyPnlMap[day] = (dailyPnlMap[day] || 0) + calcNetPnl(t);
+
+    const d = new Date(day + "T00:00:00");
+    if (!minDate || d < minDate) minDate = d;
+    if (!maxDate || d > maxDate) maxDate = d;
+  }
+
+  if (!minDate || !maxDate) return [];
+
+  const returns = [];
+  let equity = parseFloat(startingBalance) || 25000;
+  const cursor = new Date(minDate);
+
+  while (cursor <= maxDate) {
+    const dow = cursor.getDay();
+    if (dow !== 0 && dow !== 6) { // Weekdays only
+      const key = cursor.toISOString().split("T")[0];
+      const dayPnl = dailyPnlMap[key] || 0;
+      returns.push(equity > 0 ? dayPnl / equity : 0);
+      equity += dayPnl;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return returns;
 }
 
-export function calcSortinoRatio(trades) {
-  if (trades.length === 0) return 0;
-  const pnls = trades.map(t => calcNetPnl(t));
-  const mean = pnls.reduce((sum, val) => sum + val, 0) / pnls.length;
+export function calcSharpeRatio(trades, startingBalance = 25000) {
+  const dr = getDailyReturns(trades, startingBalance);
+  if (dr.length < 2) return 0;
+
+  const n = dr.length;
+  const mean = dr.reduce((s, v) => s + v, 0) / n;
+  const stdDev = Math.sqrt(dr.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / n);
   
-  // Downside deviation only penalizes negative trades (relative to target of 0)
-  const squaredDownsideDiffs = pnls.map(val => val < 0 ? Math.pow(val, 2) : 0);
-  const downsideVariance = squaredDownsideDiffs.reduce((sum, val) => sum + val, 0) / pnls.length;
-  const downsideDeviation = Math.sqrt(downsideVariance);
+  const rfrDaily = 0.02 / 252; // 2% annually / 252 trading days
+
+  if (stdDev === 0) return 0;
+  return ((mean - rfrDaily) / stdDev) * Math.sqrt(252);
+}
+
+export function calcSortinoRatio(trades, startingBalance = 25000) {
+  const dr = getDailyReturns(trades, startingBalance);
+  if (dr.length < 2) return 0;
+
+  const n = dr.length;
+  const mean = dr.reduce((s, v) => s + v, 0) / n;
   
-  if (downsideDeviation === 0) return mean > 0 ? 99.9 : 0;
-  return mean / downsideDeviation;
+  const rfrDaily = 0.02 / 252; // 2% annually / 252 trading days
+
+  // Downside deviation with daily RFR as target return
+  const downsideVariance = dr.reduce((s, v) => s + Math.pow(Math.min(0, v - rfrDaily), 2), 0) / n;
+  const downsideDev = Math.sqrt(downsideVariance);
+
+  if (downsideDev === 0) return (mean - rfrDaily) > 0 ? 99.9 : 0;
+  return ((mean - rfrDaily) / downsideDev) * Math.sqrt(252);
 }
 
 export function parseLocalDate(dateStr) {
@@ -472,8 +529,8 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   const actualAvg = actualCount > 0 ? actualTotalPnl / actualCount : 0;
   const strategyAvg = strategyCount > 0 ? strategyTotalPnl / strategyCount : 0;
 
-  const actualSharpe = calcSharpeRatio(trades.filter(t => t.status === "executed"));
-  const actualSortino = calcSortinoRatio(trades.filter(t => t.status === "executed"));
+  const actualSharpe = calcSharpeRatio(trades.filter(t => t.status === "executed"), startingBalance);
+  const actualSortino = calcSortinoRatio(trades.filter(t => t.status === "executed"), startingBalance);
 
   const strategyTrades = trades.map(t => {
     let stratPnl = 0;
@@ -493,8 +550,8 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
       entryDateTime: t.entryDateTime
     };
   });
-  const strategySharpe = calcSharpeRatio(strategyTrades);
-  const strategySortino = calcSortinoRatio(strategyTrades);
+  const strategySharpe = calcSharpeRatio(strategyTrades, startingBalance);
+  const strategySortino = calcSortinoRatio(strategyTrades, startingBalance);
 
   const actualDrawdown = calcMaxDrawdown(trades.filter(t => t.status === "executed"), startingBalance);
   const strategyDrawdown = calcMaxDrawdown(strategyTrades, startingBalance);
@@ -770,8 +827,8 @@ export function calcStreakProbability(trades) {
   // Expected streak lengths based on geometric/streak approximation formula:
   // Expected max streak of wins: log(N) / log(1/p)
   // Expected max streak of losses: log(N) / log(1/q)
-  const expectedWin = winRate > 0 && winRate < 1 ? Math.log(count) / Math.log(1 / winRate) : 0;
-  const expectedLoss = lossRate > 0 && lossRate < 1 ? Math.log(count) / Math.log(1 / lossRate) : 0;
+  const expectedWin = winRate > 0 && winRate < 1 ? Math.log(count) / Math.log(1 / winRate) : (winRate === 1 ? count : 0);
+  const expectedLoss = lossRate > 0 && lossRate < 1 ? Math.log(count) / Math.log(1 / lossRate) : (lossRate === 1 ? count : 0);
   
   const streaks = calcStreaks(trades);
   

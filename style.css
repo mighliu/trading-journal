@@ -1077,6 +1077,13 @@ input:focus, select:focus, textarea:focus {
   transition: transform 0.25s ease;
 }
 
+.modal-content form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
 .modal-overlay.open .modal-content {
   transform: translateX(0);
 }
@@ -1109,6 +1116,13 @@ input:focus, select:focus, textarea:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 }
 
 .form-group {
@@ -1923,5 +1937,68 @@ body.light-theme .form-section-header {
 /* — Live Math Bottom Separator — */
 body.light-theme .live-math-bottom {
   border-top-color: #e4e4e7;
+}
+
+/* ==========================================================================
+   TradingView-Style Performance Metrics & Slippage Alerts
+   ========================================================================== */
+
+/* Slippage Warning Icon */
+.slippage-warn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+  position: relative;
+  top: 1px;
+}
+
+/* TradingView Performance Summary Table */
+.tv-summary-table-wrapper {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.tv-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.tv-summary-table tr {
+  border-bottom: 1px solid var(--border);
+  transition: background-color 0.15s ease;
+}
+
+.tv-summary-table tr:hover {
+  background-color: var(--bg-card-hover);
+}
+
+.tv-summary-table td {
+  padding: 10px 12px;
+}
+
+.tv-summary-table td:first-child {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.tv-summary-table td:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+
+/* TV Stats Card Styling overrides */
+.stat-card.card-tv-profit {
+  background: linear-gradient(to bottom, var(--bg-card), rgba(16, 185, 129, 0.04));
+  border-color: var(--profit-border);
+  box-shadow: 0 4px 15px -2px var(--profit-glow);
+}
+
+.stat-card.card-tv-loss {
+  background: linear-gradient(to bottom, var(--bg-card), rgba(239, 68, 68, 0.04));
+  border-color: var(--loss-border);
+  box-shadow: 0 4px 15px -2px var(--loss-glow);
 }
 

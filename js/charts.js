@@ -136,6 +136,10 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -143,11 +147,24 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           titleColor: getTooltipTextColor(),
           bodyColor: getTooltipTextColor(),
           borderColor: getTooltipBorder(),
-          borderWidth: 1,
           displayColors: false,
           callbacks: {
             label: function(context) {
-              return `Balance: $${context.raw.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              const balance = context.raw;
+              const index = context.dataIndex;
+              if (index === 0) {
+                return `Balance: $${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              }
+              const prevBalance = context.dataset.data[index - 1];
+              const diff = balance - prevBalance;
+              const pct = prevBalance > 0 ? (diff / prevBalance) * 100 : 0;
+              const sign = diff >= 0 ? "+" : "";
+              const formattedDiff = diff.toLocaleString("en-US", { minimumFractionDigits: 2 });
+              const formattedPct = pct.toFixed(2);
+              return [
+                `Balance: $${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+                `Change: ${sign}$${formattedDiff} (${sign}${formattedPct}%)`
+              ];
             }
           }
         }
@@ -1949,7 +1966,9 @@ export function renderRollingPerformanceChart(trades) {
           borderWidth: 2,
           yAxisID: "yWinRate",
           tension: 0.3,
-          pointRadius: winRates.length > 50 ? 0 : 3
+          pointRadius: winRates.length > 50 ? 1 : 4,
+          pointHoverRadius: 7,
+          pointHitRadius: 10
         },
         {
           label: `Rolling ${windowSize}-Trade Profit Factor`,
@@ -1959,13 +1978,19 @@ export function renderRollingPerformanceChart(trades) {
           borderWidth: 2,
           yAxisID: "yProfitFactor",
           tension: 0.3,
-          pointRadius: profitFactors.length > 50 ? 0 : 3
+          pointRadius: profitFactors.length > 50 ? 1 : 4,
+          pointHoverRadius: 7,
+          pointHitRadius: 10
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: {
           display: true,
