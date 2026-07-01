@@ -12,6 +12,7 @@ import {
   calcPostLossPerformance,
   calcProfitFactor
 } from './utils.js';
+import { AppState } from './state.js';
 
 const chartInstances = {};
 
@@ -1706,6 +1707,11 @@ export function renderHoldTimeChart(trades) {
 }
 
 export function renderMfeMaeCharts(trades) {
+  // Sort executed trades globally to ensure trade number consistency
+  const allExecuted = AppState.trades
+    .filter(x => x.status === "executed")
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+
   // 1. MFE Scatter
   const mfeCanvasId = "mfeScatterChart";
   destroyChart(mfeCanvasId);
@@ -1716,7 +1722,9 @@ export function renderMfeMaeCharts(trades) {
       const mfe = calcMfe(t);
       const pnl = calcNetPnl(t);
       if (mfe !== null && !isNaN(mfe)) {
-        dataPoints.push({ x: mfe, y: pnl, symbol: t.symbol });
+        const globalIdx = allExecuted.findIndex(x => x.id === t.id);
+        const tradeNo = globalIdx !== -1 ? globalIdx + 1 : null;
+        dataPoints.push({ x: mfe, y: pnl, symbol: t.symbol, tradeNo: tradeNo });
       }
     });
 
@@ -1747,7 +1755,8 @@ export function renderMfeMaeCharts(trades) {
               callbacks: {
                 label: function(context) {
                   const p = context.raw;
-                  return `${p.symbol}: MFE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+                  const numStr = p.tradeNo ? `Trade #${p.tradeNo} ` : "";
+                  return `${numStr}(${p.symbol}): MFE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
                 }
               }
             }
@@ -1784,7 +1793,9 @@ export function renderMfeMaeCharts(trades) {
       const mae = calcMae(t);
       const pnl = calcNetPnl(t);
       if (mae !== null && !isNaN(mae)) {
-        dataPoints.push({ x: mae, y: pnl, symbol: t.symbol });
+        const globalIdx = allExecuted.findIndex(x => x.id === t.id);
+        const tradeNo = globalIdx !== -1 ? globalIdx + 1 : null;
+        dataPoints.push({ x: mae, y: pnl, symbol: t.symbol, tradeNo: tradeNo });
       }
     });
 
@@ -1815,7 +1826,8 @@ export function renderMfeMaeCharts(trades) {
               callbacks: {
                 label: function(context) {
                   const p = context.raw;
-                  return `${p.symbol}: MAE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+                  const numStr = p.tradeNo ? `Trade #${p.tradeNo} ` : "";
+                  return `${numStr}(${p.symbol}): MAE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
                 }
               }
             }
