@@ -660,6 +660,46 @@ export function calcMaePct(trade) {
   }
 }
 
+export function calcMfe(trade) {
+  if (!trade.entryPrice || !trade.qty || trade.status === "skipped") return null;
+  const entry = parseFloat(trade.entryPrice);
+  const qty = parseFloat(trade.qty);
+  if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
+  
+  const mult = getSymbolMultiplier(trade.symbol, trade.assetClass);
+  
+  if (trade.direction === "long") {
+    if (!trade.maxPrice) return null;
+    const maxVal = parseFloat(trade.maxPrice);
+    if (isNaN(maxVal)) return null;
+    return (maxVal - entry) * qty * mult;
+  } else {
+    if (!trade.minPrice) return null;
+    const minVal = parseFloat(trade.minPrice);
+    if (isNaN(minVal) || minVal === 0) return null;
+    return (entry - minVal) * qty * mult;
+  }
+}
+
+export function calcMae(trade) {
+  if (!trade.entryPrice || !trade.qty || trade.status === "skipped") return null;
+  const entry = parseFloat(trade.entryPrice);
+  const qty = parseFloat(trade.qty);
+  if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
+  
+  const mult = getSymbolMultiplier(trade.symbol, trade.assetClass);
+  
+  if (trade.direction === "long") {
+    const minVal = parseFloat(trade.minPrice);
+    if (isNaN(minVal)) return null;
+    return (entry - minVal) * qty * mult;
+  } else {
+    const maxVal = parseFloat(trade.maxPrice);
+    if (isNaN(maxVal)) return null;
+    return (maxVal - entry) * qty * mult;
+  }
+}
+
 export function isRevengeTrade(trade, allTrades) {
   if (trade.status !== "executed") return false;
   const sorted = [...allTrades]

@@ -5,8 +5,8 @@ import {
   calcInterventionMetrics,
   hasSevereDeviation,
   calcDuration,
-  calcMfePct,
-  calcMaePct,
+  calcMfe,
+  calcMae,
   calcRiskReward,
   calcDailySequence,
   calcPostLossPerformance,
@@ -1713,7 +1713,7 @@ export function renderMfeMaeCharts(trades) {
   if (mfeCanvas) {
     const dataPoints = [];
     trades.forEach(t => {
-      const mfe = calcMfePct(t);
+      const mfe = calcMfe(t);
       const pnl = calcNetPnl(t);
       if (mfe !== null && !isNaN(mfe)) {
         dataPoints.push({ x: mfe, y: pnl, symbol: t.symbol });
@@ -1747,16 +1747,21 @@ export function renderMfeMaeCharts(trades) {
               callbacks: {
                 label: function(context) {
                   const p = context.raw;
-                  return `${p.symbol}: MFE ${p.x.toFixed(2)}%, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+                  return `${p.symbol}: MFE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
                 }
               }
             }
           },
           scales: {
             x: {
-              title: { display: true, text: "MFE (%)", color: "#a1a1aa" },
+              title: { display: true, text: "MFE ($)", color: "#a1a1aa" },
               grid: { color: getGridColor() },
-              ticks: { color: getTickColor() }
+              ticks: { 
+                color: getTickColor(),
+                callback: function(value) {
+                  return `$${value}`;
+                }
+              }
             },
             y: {
               title: { display: true, text: "Realized P&L ($)", color: "#a1a1aa" },
@@ -1776,7 +1781,7 @@ export function renderMfeMaeCharts(trades) {
   if (maeCanvas) {
     const dataPoints = [];
     trades.forEach(t => {
-      const mae = calcMaePct(t);
+      const mae = calcMae(t);
       const pnl = calcNetPnl(t);
       if (mae !== null && !isNaN(mae)) {
         dataPoints.push({ x: mae, y: pnl, symbol: t.symbol });
@@ -1810,16 +1815,21 @@ export function renderMfeMaeCharts(trades) {
               callbacks: {
                 label: function(context) {
                   const p = context.raw;
-                  return `${p.symbol}: MAE ${p.x.toFixed(2)}%, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+                  return `${p.symbol}: MAE $${p.x.toLocaleString(undefined, {minimumFractionDigits:2})}, P&L: $${p.y.toLocaleString(undefined, {minimumFractionDigits:2})}`;
                 }
               }
             }
           },
           scales: {
             x: {
-              title: { display: true, text: "MAE (%)", color: "#a1a1aa" },
+              title: { display: true, text: "MAE ($)", color: "#a1a1aa" },
               grid: { color: getGridColor() },
-              ticks: { color: getTickColor() }
+              ticks: { 
+                color: getTickColor(),
+                callback: function(value) {
+                  return `$${value}`;
+                }
+              }
             },
             y: {
               title: { display: true, text: "Realized P&L ($)", color: "#a1a1aa" },
