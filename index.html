@@ -841,6 +841,20 @@
           </div>
         </div>
 
+        <!-- Excursion Analysis Statistics Cards -->
+        <div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+          <div class="stat-card card-tv-profit">
+            <h4 class="stat-label"><i data-lucide="award" style="width: 13px; height: 13px; color: #34d399; vertical-align: middle; margin-right: 4px;"></i> Exit Efficiency (MFE Captured)</h4>
+            <div class="stat-value" id="riskExitEfficiency">--</div>
+            <span class="muted" id="riskExitEfficiencyDetail" style="font-size: 0.75rem;">Captured -- of -- total potential gains</span>
+          </div>
+          <div class="stat-card card-tv-loss">
+            <h4 class="stat-label"><i data-lucide="shield" style="width: 13px; height: 13px; color: #ef4444; vertical-align: middle; margin-right: 4px;"></i> Drawdown Control (MAE Savings)</h4>
+            <div class="stat-value" id="riskDrawdownControl">--</div>
+            <span class="muted" id="riskDrawdownControlDetail" style="font-size: 0.75rem;">Saved -- of -- max excursion drawdowns</span>
+          </div>
+        </div>
+
         <div class="dashboard-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
           <div class="chart-card">
             <div class="chart-header">

@@ -22,7 +22,9 @@ import {
   calcMaxDrawdown,
   isRevengeTrade,
   calcDrawdownDurations,
-  calcStreakProbability
+  calcStreakProbability,
+  calcMfe,
+  calcMae
 } from './utils.js';
 
 let currentEditId = null;
@@ -1936,6 +1938,45 @@ export function renderRiskTab(trades) {
   const dds = calcDrawdownDurations(trades, AppState.settings.startingBalance);
   const streakProb = calcStreakProbability(trades);
   
+  // MFE exit efficiency calculations (across winning trades with MFE recorded)
+  const tradesWithMfe = trades.filter(t => t.status === "executed" && calcMfe(t) !== null);
+  const winningMfeTrades = tradesWithMfe.filter(t => calcNetPnl(t) > 0);
+  const totalMfe = winningMfeTrades.reduce((sum, t) => sum + calcMfe(t), 0);
+  const totalCaptured = winningMfeTrades.reduce((sum, t) => sum + calcNetPnl(t), 0);
+  const exitEfficiency = totalMfe > 0 ? (totalCaptured / totalMfe) * 100 : 0;
+  const leftOnTable = totalMfe - totalCaptured;
+
+  // MAE drawdown control calculations (across all trades with MAE recorded)
+  const tradesWithMae = trades.filter(t => t.status === "executed" && calcMae(t) !== null);
+  const totalMae = tradesWithMae.reduce((sum, t) => sum + calcMae(t), 0);
+  const losingMaeTrades = tradesWithMae.filter(t => calcNetPnl(t) < 0);
+  const totalRealizedLoss = losingMaeTrades.reduce((sum, t) => sum + Math.abs(calcNetPnl(t)), 0);
+  const savedDrawdown = totalMae - totalRealizedLoss;
+  const drawdownControl = totalMae > 0 ? (savedDrawdown / totalMae) * 100 : 0;
+
+  const riskExitEfficiency = document.getElementById("riskExitEfficiency");
+  const riskExitEfficiencyDetail = document.getElementById("riskExitEfficiencyDetail");
+  const riskDrawdownControl = document.getElementById("riskDrawdownControl");
+  const riskDrawdownControlDetail = document.getElementById("riskDrawdownControlDetail");
+
+  if (riskExitEfficiency) {
+    riskExitEfficiency.textContent = totalMfe > 0 ? `${exitEfficiency.toFixed(1)}%` : "--";
+  }
+  if (riskExitEfficiencyDetail) {
+    riskExitEfficiencyDetail.textContent = totalMfe > 0 
+      ? `Captured $${totalCaptured.toLocaleString(undefined, {maximumFractionDigits:0})} of $${totalMfe.toLocaleString(undefined, {maximumFractionDigits:0})} peak gains ($${leftOnTable.toLocaleString(undefined, {maximumFractionDigits:0})} left on table)`
+      : "No MFE data available for winning trades";
+  }
+
+  if (riskDrawdownControl) {
+    riskDrawdownControl.textContent = totalMae > 0 ? `${drawdownControl.toFixed(1)}%` : "--";
+  }
+  if (riskDrawdownControlDetail) {
+    riskDrawdownControlDetail.textContent = totalMae > 0
+      ? `Saved $${savedDrawdown.toLocaleString(undefined, {maximumFractionDigits:0})} of $${totalMae.toLocaleString(undefined, {maximumFractionDigits:0})} total drawdown ($${totalRealizedLoss.toLocaleString(undefined, {maximumFractionDigits:0})} realized loss)`
+      : "No MAE data available for trades";
+  }
+
   const riskMaxDdDays = document.getElementById("riskMaxDdDays");
   const riskMaxDdTrades = document.getElementById("riskMaxDdTrades");
   const riskCurrentDdDuration = document.getElementById("riskCurrentDdDuration");
