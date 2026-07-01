@@ -680,7 +680,12 @@ export function calcMaePct(trade) {
 }
 
 export function calcMfe(trade) {
-  if (!trade.entryPrice || !trade.qty || trade.status === "skipped") return null;
+  if (trade.status === "skipped") return null;
+  if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
+    return parseFloat(trade.mfe);
+  }
+  
+  if (!trade.entryPrice || !trade.qty) return null;
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
   const exit = parseFloat(trade.exitPrice) || 0;
@@ -704,7 +709,12 @@ export function calcMfe(trade) {
 }
 
 export function calcMae(trade) {
-  if (!trade.entryPrice || !trade.qty || trade.status === "skipped") return null;
+  if (trade.status === "skipped") return null;
+  if (trade.mae != null && !isNaN(parseFloat(trade.mae))) {
+    return parseFloat(trade.mae);
+  }
+  
+  if (!trade.entryPrice || !trade.qty) return null;
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
   const exit = parseFloat(trade.exitPrice) || 0;

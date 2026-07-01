@@ -1229,16 +1229,60 @@ export function setupUIListeners() {
       const checkedCount = Object.values(checklistItems).filter(Boolean).length;
       const adherenceScore = Math.round((checkedCount / 5) * 100);
 
+      const entryPriceVal = parseFloat(document.getElementById("tradeEntryPrice").value) || 0;
+      const exitPriceVal = parseFloat(document.getElementById("tradeExitPrice").value) || 0;
+      const qtyVal = parseFloat(document.getElementById("tradeQty").value) || 0;
+      const feesVal = parseFloat(document.getElementById("tradeFees").value) || 0;
+      const assetClassVal = document.getElementById("tradeAssetClass").value;
+      const symbolVal = document.getElementById("tradeSymbol").value;
+      const maxPriceVal = document.getElementById("tradeMaxPrice").value ? parseFloat(document.getElementById("tradeMaxPrice").value) : null;
+      const minPriceVal = document.getElementById("tradeMinPrice").value ? parseFloat(document.getElementById("tradeMinPrice").value) : null;
+
+      let mfe = null;
+      let mae = null;
+
+      if (qtyVal > 0 && entryPriceVal > 0 && currentStatus === "executed") {
+        let mult = getSymbolMultiplier(symbolVal, assetClassVal);
+        if (isOverridden) {
+          const manualPnl = parseFloat(document.getElementById("tradeManualPnl").value) || 0;
+          const directionMultiplier = currentDirection === "short" ? -1 : 1;
+          const priceDiff = (exitPriceVal - entryPriceVal) * directionMultiplier;
+          if (!isNaN(priceDiff) && priceDiff !== 0) {
+            mult = Math.abs((manualPnl + feesVal) / (priceDiff * qtyVal));
+          }
+        }
+
+        if (maxPriceVal !== null && !isNaN(maxPriceVal)) {
+          const maxVal = Math.max(maxPriceVal, entryPriceVal, exitPriceVal);
+          const diff = maxVal - entryPriceVal;
+          if (currentDirection === "long") {
+            mfe = diff * qtyVal * mult;
+          } else {
+            mae = diff * qtyVal * mult;
+          }
+        }
+
+        if (minPriceVal !== null && !isNaN(minPriceVal)) {
+          const minVal = Math.min(minPriceVal, entryPriceVal, exitPriceVal);
+          const diff = entryPriceVal - minVal;
+          if (currentDirection === "long") {
+            mae = diff * qtyVal * mult;
+          } else {
+            mfe = diff * qtyVal * mult;
+          }
+        }
+      }
+
       const tradeData = {
-        symbol: document.getElementById("tradeSymbol").value,
+        symbol: symbolVal,
         direction: currentDirection,
         entryDateTime: document.getElementById("tradeEntryDateTime").value,
         exitDateTime: document.getElementById("tradeExitDateTime").value,
-        entryPrice: parseFloat(document.getElementById("tradeEntryPrice").value) || 0,
-        exitPrice: parseFloat(document.getElementById("tradeExitPrice").value) || 0,
-        qty: parseFloat(document.getElementById("tradeQty").value),
+        entryPrice: entryPriceVal,
+        exitPrice: exitPriceVal,
+        qty: qtyVal,
         stopLoss: document.getElementById("tradeStopLoss").value ? parseFloat(document.getElementById("tradeStopLoss").value) : null,
-        fees: parseFloat(document.getElementById("tradeFees").value) || 0,
+        fees: feesVal,
         setup: document.getElementById("tradeSetup").value,
         notes: document.getElementById("tradeNotes").value,
         lessons: document.getElementById("tradeLessons").value,
@@ -1246,13 +1290,15 @@ export function setupUIListeners() {
         signalEntryPrice: document.getElementById("tradeSignalEntryPrice").value ? parseFloat(document.getElementById("tradeSignalEntryPrice").value) : null,
         signalExitPrice: document.getElementById("tradeSignalExitPrice").value ? parseFloat(document.getElementById("tradeSignalExitPrice").value) : null,
         mistake: document.getElementById("tradeMistake").value,
-        assetClass: document.getElementById("tradeAssetClass").value,
+        assetClass: assetClassVal,
         status: currentStatus,
         overridePnl: isOverridden,
         manualPnl: isOverridden ? parseFloat(document.getElementById("tradeManualPnl").value) || 0 : null,
         interventionType: document.getElementById("tradeHasIntervention").checked ? document.getElementById("tradeIntervention").value : "followed",
-        maxPrice: document.getElementById("tradeMaxPrice").value ? parseFloat(document.getElementById("tradeMaxPrice").value) : null,
-        minPrice: document.getElementById("tradeMinPrice").value ? parseFloat(document.getElementById("tradeMinPrice").value) : null,
+        maxPrice: maxPriceVal,
+        minPrice: minPriceVal,
+        mfe: mfe,
+        mae: mae,
         checklistItems,
         adherenceScore
       };

@@ -1,4 +1,4 @@
-import { calcNetPnl, getDateRange, normalizeDateTime, parseLocalDate } from './utils.js';
+import { calcNetPnl, getDateRange, normalizeDateTime, parseLocalDate, getSymbolMultiplier } from './utils.js';
 
 
 class StateManager {
@@ -149,6 +149,8 @@ class StateManager {
       interventionType: tradeData.interventionType || "followed",
       maxPrice: tradeData.maxPrice != null && tradeData.maxPrice !== "" ? parseFloat(tradeData.maxPrice) : null,
       minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null,
+      mfe: tradeData.mfe != null ? parseFloat(tradeData.mfe) : null,
+      mae: tradeData.mae != null ? parseFloat(tradeData.mae) : null,
       checklistItems: tradeData.checklistItems || null,
       adherenceScore: tradeData.adherenceScore !== undefined ? tradeData.adherenceScore : null
     };
@@ -188,6 +190,8 @@ class StateManager {
       interventionType: tradeData.interventionType || "followed",
       maxPrice: tradeData.maxPrice != null && tradeData.maxPrice !== "" ? parseFloat(tradeData.maxPrice) : null,
       minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null,
+      mfe: tradeData.mfe != null ? parseFloat(tradeData.mfe) : null,
+      mae: tradeData.mae != null ? parseFloat(tradeData.mae) : null,
       checklistItems: tradeData.checklistItems || null,
       adherenceScore: tradeData.adherenceScore !== undefined ? tradeData.adherenceScore : null
     };
@@ -491,7 +495,7 @@ class StateManager {
       "EntryPrice", "ExitPrice", "Qty", "StopLoss", "Fees", "Setup", 
       "Notes", "Lessons", "ScreenshotUrl", "SignalEntryPrice", "SignalExitPrice",
       "Mistake", "AccountId", "AssetClass", "Status", "OverridePnl", "ManualPnl", "InterventionType",
-      "MaxPrice", "MinPrice"
+      "MaxPrice", "MinPrice", "MFE", "MAE"
     ];
     
     const rows = this.trades.map(t => [
@@ -519,7 +523,9 @@ class StateManager {
       t.manualPnl != null ? t.manualPnl : "",
       t.interventionType || "followed",
       t.maxPrice != null ? t.maxPrice : "",
-      t.minPrice != null ? t.minPrice : ""
+      t.minPrice != null ? t.minPrice : "",
+      t.mfe != null ? t.mfe : "",
+      t.mae != null ? t.mae : ""
     ]);
 
     const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
@@ -569,7 +575,9 @@ class StateManager {
             manualPnl: t.manualPnl != null ? parseFloat(t.manualPnl) : null,
             interventionType: t.interventionType || "followed",
             maxPrice: t.maxPrice != null && t.maxPrice !== "" ? parseFloat(t.maxPrice) : null,
-            minPrice: t.minPrice != null && t.minPrice !== "" ? parseFloat(t.minPrice) : null
+            minPrice: t.minPrice != null && t.minPrice !== "" ? parseFloat(t.minPrice) : null,
+            mfe: t.mfe != null ? parseFloat(t.mfe) : null,
+            mae: t.mae != null ? parseFloat(t.mae) : null
           }));
           
           this.trades = [...this.trades, ...validated];
@@ -646,7 +654,9 @@ class StateManager {
               manualPnl: cols[21] ? parseFloat(cols[21]) : null,
               interventionType: cols[22] || "followed",
               maxPrice: cols[23] ? parseFloat(cols[23]) : null,
-              minPrice: cols[24] ? parseFloat(cols[24]) : null
+              minPrice: cols[24] ? parseFloat(cols[24]) : null,
+              mfe: cols[25] ? parseFloat(cols[25]) : null,
+              mae: cols[26] ? parseFloat(cols[26]) : null
             });
           }
 
@@ -706,6 +716,9 @@ class StateManager {
             const mfePctIdx = headers.includes("favorable excursion %") ? headers.indexOf("favorable excursion %") : headers.findIndex(h => h.includes("favorable excursion %"));
             const maePctIdx = headers.includes("adverse excursion %") ? headers.indexOf("adverse excursion %") : headers.findIndex(h => h.includes("adverse excursion %"));
             
+            const mfeValIdx = headers.findIndex(h => h.includes("run-up usd") || h.includes("run-up ($)") || h === "run-up" || h.includes("max run-up") || h.includes("favorable excursion usd") || h.includes("favorable excursion ($)"));
+            const maeValIdx = headers.findIndex(h => h.includes("drawdown usd") || h.includes("drawdown ($)") || h === "drawdown" || h.includes("max drawdown") || h.includes("adverse excursion usd") || h.includes("adverse excursion ($)"));
+            
             // Group rows by trade number
             const groups = {};
             for (let i = 1; i < jsonData.length; i++) {
@@ -741,9 +754,45 @@ class StateManager {
                 // Reconstruct maxPrice and minPrice from excursions
                 let maxPrice = null;
                 let minPrice = null;
+                let mfeVal = null;
+                let maeVal = null;
                 
                 const mfePct = mfePctIdx !== -1 && exitRow[mfePctIdx] !== undefined ? Math.abs(parseFloat(exitRow[mfePctIdx])) : null;
                 const maePct = maePctIdx !== -1 && exitRow[maePctIdx] !== undefined ? Math.abs(parseFloat(exitRow[maePctIdx])) : null;
+                
+                if (mfeValIdx !== -1 && exitRow[mfeValIdx] !== undefined) {
+                  const val = parseFloat(exitRow[mfeValIdx]);
+                  if (!isNaN(val)) mfeVal = Math.abs(val);
+                }
+                if (maeValIdx !== -1 && exitRow[maeValIdx] !== undefined) {
+                  const val = parseFloat(exitRow[maeValIdx]);
+                  if (!isNaN(val)) maeVal = Math.abs(val);
+                }
+                
+                // If dollar values not found directly, try percent values and convert
+                if (mfeVal === null) {
+                  if (mfePct !== null && !isNaN(mfePct) && entryPrice > 0 && qty > 0) {
+                    const directionMultiplier = direction === "short" ? -1 : 1;
+                    const priceDiff = (exitPrice - entryPrice) * directionMultiplier;
+                    let mult = getSymbolMultiplier(symbol, "stocks");
+                    if (priceDiff !== 0) {
+                      mult = Math.abs(profitVal / (priceDiff * qty));
+                    }
+                    mfeVal = entryPrice * (mfePct / 100) * qty * mult;
+                  }
+                }
+                
+                if (maeVal === null) {
+                  if (maePct !== null && !isNaN(maePct) && entryPrice > 0 && qty > 0) {
+                    const directionMultiplier = direction === "short" ? -1 : 1;
+                    const priceDiff = (exitPrice - entryPrice) * directionMultiplier;
+                    let mult = getSymbolMultiplier(symbol, "stocks");
+                    if (priceDiff !== 0) {
+                      mult = Math.abs(profitVal / (priceDiff * qty));
+                    }
+                    maeVal = entryPrice * (maePct / 100) * qty * mult;
+                  }
+                }
                 
                 if (entryPrice > 0) {
                   if (direction === "long") {
@@ -796,7 +845,9 @@ class StateManager {
                   manualPnl: profitVal,
                   interventionType: "followed",
                   maxPrice: maxPrice,
-                  minPrice: minPrice
+                  minPrice: minPrice,
+                  mfe: mfeVal,
+                  mae: maeVal
                 });
               }
             });
