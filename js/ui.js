@@ -652,6 +652,7 @@ export function openTradeModal(id = null) {
   if (id) {
     title.textContent = "Edit Trade";
     const trade = AppState.trades.find(t => t.id === id);
+    console.log("openTradeModal: Editing ID =", id, "Found trade =", trade);
     if (trade) {
       document.getElementById("tradeSymbol").value = trade.symbol;
       currentDirection = trade.direction;
@@ -1295,9 +1296,11 @@ export function setupUIListeners() {
         return;
       }
 
+      console.log("Form submit: currentEditId =", currentEditId, "tradeData =", tradeData);
       try {
         if (currentEditId) {
           AppState.updateTrade(currentEditId, tradeData);
+          console.log("After updateTrade inside state:", AppState.trades.find(t => t.id === currentEditId));
           showToast("Trade updated successfully.", "success");
         } else {
           AppState.addTrade(tradeData);

@@ -188,8 +188,8 @@ class StateManager {
       interventionType: tradeData.interventionType || "followed",
       maxPrice: tradeData.maxPrice != null && tradeData.maxPrice !== "" ? parseFloat(tradeData.maxPrice) : null,
       minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null,
-      checklistItems: tradeData.checklistItems !== undefined ? tradeData.checklistItems : this.trades[idx].checklistItems,
-      adherenceScore: tradeData.adherenceScore !== undefined ? tradeData.adherenceScore : this.trades[idx].adherenceScore
+      checklistItems: tradeData.checklistItems || null,
+      adherenceScore: tradeData.adherenceScore !== undefined ? tradeData.adherenceScore : null
     };
     
     this.saveToStorage();
