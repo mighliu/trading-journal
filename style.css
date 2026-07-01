@@ -219,6 +219,14 @@ input:focus, select:focus, textarea:focus {
   transition: all 0.2s ease;
 }
 
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2px;
+  fill: none;
+}
+
 .btn-icon:hover {
   background-color: var(--border);
   color: var(--text-primary);
@@ -788,12 +796,18 @@ input:focus, select:focus, textarea:focus {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.calendar-nav .btn-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5px;
 }
 
 .calendar-nav .btn-icon:hover {
@@ -811,7 +825,7 @@ input:focus, select:focus, textarea:focus {
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  gap: 6px;
 }
 
 .calendar-day-header {
@@ -827,8 +841,8 @@ input:focus, select:focus, textarea:focus {
   background-color: var(--bg-cell);
   border: 1px solid var(--border);
   border-radius: 8px;
-  aspect-ratio: 1.5;
-  padding: 6px 8px;
+  aspect-ratio: 1.95;
+  padding: 4px 6px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
