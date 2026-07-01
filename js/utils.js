@@ -628,18 +628,20 @@ export function calcMaxDrawdown(trades, startingBalance = 25000) {
 export function calcMfePct(trade) {
   if (!trade.entryPrice || trade.status === "skipped") return null;
   const entry = parseFloat(trade.entryPrice);
+  const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0) return null;
   
   if (trade.direction === "long") {
     if (!trade.maxPrice) return null;
-    const maxVal = parseFloat(trade.maxPrice);
-    if (isNaN(maxVal)) return null;
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return null;
+    const maxVal = Math.max(rawMax, entry, exit);
     return ((maxVal - entry) / entry) * 100;
   } else {
-    // For short, MFE is based on how low the price went (minPrice)
     if (!trade.minPrice) return null;
-    const minVal = parseFloat(trade.minPrice);
-    if (isNaN(minVal) || minVal === 0) return null;
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin) || rawMin === 0) return null;
+    const minVal = Math.min(rawMin, entry, exit);
     return ((entry - minVal) / entry) * 100;
   }
 }
@@ -647,15 +649,20 @@ export function calcMfePct(trade) {
 export function calcMaePct(trade) {
   if (!trade.entryPrice || trade.status === "skipped") return null;
   const entry = parseFloat(trade.entryPrice);
+  const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0) return null;
   
   if (trade.direction === "long") {
-    const minVal = parseFloat(trade.minPrice);
-    if (isNaN(minVal)) return null;
+    if (!trade.minPrice) return null;
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin)) return null;
+    const minVal = Math.min(rawMin, entry, exit);
     return ((entry - minVal) / entry) * 100;
   } else {
-    const maxVal = parseFloat(trade.maxPrice);
-    if (isNaN(maxVal)) return null;
+    if (!trade.maxPrice) return null;
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return null;
+    const maxVal = Math.max(rawMax, entry, exit);
     return ((maxVal - entry) / entry) * 100;
   }
 }
@@ -664,19 +671,22 @@ export function calcMfe(trade) {
   if (!trade.entryPrice || !trade.qty || trade.status === "skipped") return null;
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
+  const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
   
   const mult = getSymbolMultiplier(trade.symbol, trade.assetClass);
   
   if (trade.direction === "long") {
     if (!trade.maxPrice) return null;
-    const maxVal = parseFloat(trade.maxPrice);
-    if (isNaN(maxVal)) return null;
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return null;
+    const maxVal = Math.max(rawMax, entry, exit);
     return (maxVal - entry) * qty * mult;
   } else {
     if (!trade.minPrice) return null;
-    const minVal = parseFloat(trade.minPrice);
-    if (isNaN(minVal) || minVal === 0) return null;
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin) || rawMin === 0) return null;
+    const minVal = Math.min(rawMin, entry, exit);
     return (entry - minVal) * qty * mult;
   }
 }
@@ -685,17 +695,22 @@ export function calcMae(trade) {
   if (!trade.entryPrice || !trade.qty || trade.status === "skipped") return null;
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
+  const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
   
   const mult = getSymbolMultiplier(trade.symbol, trade.assetClass);
   
   if (trade.direction === "long") {
-    const minVal = parseFloat(trade.minPrice);
-    if (isNaN(minVal)) return null;
+    if (!trade.minPrice) return null;
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin)) return null;
+    const minVal = Math.min(rawMin, entry, exit);
     return (entry - minVal) * qty * mult;
   } else {
-    const maxVal = parseFloat(trade.maxPrice);
-    if (isNaN(maxVal)) return null;
+    if (!trade.maxPrice) return null;
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return null;
+    const maxVal = Math.max(rawMax, entry, exit);
     return (maxVal - entry) * qty * mult;
   }
 }
