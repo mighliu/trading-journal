@@ -116,36 +116,41 @@ export function calcPnlDiff(signalPnl, actualPnl) {
 }
 
 export function calcRiskReward(trade) {
-  if (!trade.stopLoss) return null;
   const entry = parseFloat(trade.entryPrice);
   const exit = parseFloat(trade.exitPrice);
-  const stop = parseFloat(trade.stopLoss);
   const qty = parseFloat(trade.qty) || 0;
-  
-  let riskPerUnit = 0;
-  if (trade.direction === "long") {
-    riskPerUnit = entry - stop;
-  } else {
-    riskPerUnit = stop - entry;
-  }
-  
-  if (riskPerUnit <= 0) return null;
-  
-  if (trade.overridePnl && trade.manualPnl != null) {
-    let multiplier = getSymbolMultiplier(trade.symbol, trade.assetClass);
-    const directionMultiplier = trade.direction === "long" ? 1 : -1;
-    const priceDiff = (trade.exitPrice - trade.entryPrice) * directionMultiplier;
-    const fees = parseFloat(trade.fees) || 0;
-    if (!isNaN(priceDiff) && priceDiff !== 0 && qty > 0) {
-      multiplier = Math.abs((parseFloat(trade.manualPnl) + fees) / (priceDiff * qty));
+  if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
+
+  let riskVal = 0;
+
+  // 1. If stop loss is provided, use it to calculate the risk
+  if (trade.stopLoss) {
+    const stop = parseFloat(trade.stopLoss);
+    let riskPerUnit = 0;
+    if (trade.direction === "long") {
+      riskPerUnit = entry - stop;
+    } else {
+      riskPerUnit = stop - entry;
     }
-    const riskVal = riskPerUnit * qty * multiplier;
-    if (riskVal <= 0) return null;
-    return calcNetPnl(trade) / riskVal;
+    
+    if (riskPerUnit > 0) {
+      const mult = getEffectiveMultiplier(trade);
+      riskVal = riskPerUnit * qty * mult;
+    }
   }
-  
-  let rewardPerUnit = trade.direction === "long" ? exit - entry : entry - exit;
-  return rewardPerUnit / riskPerUnit;
+
+  // 2. If no stop loss (or invalid risk), fallback to MAE as the risk proxy
+  if (riskVal <= 0) {
+    const mae = calcMae(trade);
+    if (mae !== null && mae > 0) {
+      riskVal = mae;
+    }
+  }
+
+  if (riskVal <= 0) return null;
+
+  // R-Multiple = Net P&L / Risk
+  return calcNetPnl(trade) / riskVal;
 }
 
 export function calcDuration(entryDateStr, exitDateStr) {
