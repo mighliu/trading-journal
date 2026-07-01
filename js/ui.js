@@ -1969,8 +1969,8 @@ export function renderRiskTab(trades) {
   }
   if (riskExitEfficiencyDetail) {
     riskExitEfficiencyDetail.textContent = totalMfe > 0 
-      ? `Captured $${totalCaptured.toLocaleString(undefined, {maximumFractionDigits:0})} of $${totalMfe.toLocaleString(undefined, {maximumFractionDigits:0})} peak gains ($${leftOnTable.toLocaleString(undefined, {maximumFractionDigits:0})} left on table)`
-      : "No MFE data available for winning trades";
+      ? `(Captured $${totalCaptured.toLocaleString(undefined, {maximumFractionDigits:0})} of $${totalMfe.toLocaleString(undefined, {maximumFractionDigits:0})} peak gains, $${leftOnTable.toLocaleString(undefined, {maximumFractionDigits:0})} left on table)`
+      : "(No MFE data available)";
   }
 
   if (riskDrawdownControl) {
@@ -1978,8 +1978,8 @@ export function renderRiskTab(trades) {
   }
   if (riskDrawdownControlDetail) {
     riskDrawdownControlDetail.textContent = totalMae > 0
-      ? `Saved $${savedDrawdown.toLocaleString(undefined, {maximumFractionDigits:0})} of $${totalMae.toLocaleString(undefined, {maximumFractionDigits:0})} total drawdown ($${totalRealizedLoss.toLocaleString(undefined, {maximumFractionDigits:0})} realized loss)`
-      : "No MAE data available for trades";
+      ? `(Saved $${savedDrawdown.toLocaleString(undefined, {maximumFractionDigits:0})} of $${totalMae.toLocaleString(undefined, {maximumFractionDigits:0})} total drawdown, $${totalRealizedLoss.toLocaleString(undefined, {maximumFractionDigits:0})} realized loss)`
+      : "(No MAE data available)";
   }
 
   const riskMaxDdDays = document.getElementById("riskMaxDdDays");
