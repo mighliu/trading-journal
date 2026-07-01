@@ -542,6 +542,34 @@ export function renderTradeLog(trades, page = 1) {
             <p>${escapedLessons || "No lessons recorded for this trade."}</p>
             ${comparisonMarkup}
           </div>
+          <div class="detail-checklist-box" style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; height: fit-content;">
+            <span class="detail-label" style="margin-bottom: 0;">Discipline Checklist</span>
+            <div style="font-size: 1.25rem; font-weight: 700; color: ${(t.adherenceScore != null ? t.adherenceScore : 100) >= 80 ? 'var(--profit)' : (t.adherenceScore != null ? t.adherenceScore : 100) >= 40 ? '#eab308' : 'var(--loss)'}; margin-bottom: 4px;">
+              ${t.adherenceScore != null ? t.adherenceScore + '%' : '100%'}
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                <span>Trend Aligned:</span>
+                <span class="bold" style="color: ${!t.checklistItems || t.checklistItems.trend ? 'var(--profit)' : 'var(--loss)'}">${!t.checklistItems || t.checklistItems.trend ? 'Yes' : 'No'}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                <span>Key Level:</span>
+                <span class="bold" style="color: ${!t.checklistItems || t.checklistItems.level ? 'var(--profit)' : 'var(--loss)'}">${!t.checklistItems || t.checklistItems.level ? 'Yes' : 'No'}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                <span>Volume Conf:</span>
+                <span class="bold" style="color: ${!t.checklistItems || t.checklistItems.volume ? 'var(--profit)' : 'var(--loss)'}">${!t.checklistItems || t.checklistItems.volume ? 'Yes' : 'No'}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+                <span>Entry Trigger:</span>
+                <span class="bold" style="color: ${!t.checklistItems || t.checklistItems.trigger ? 'var(--profit)' : 'var(--loss)'}">${!t.checklistItems || t.checklistItems.trigger ? 'Yes' : 'No'}</span>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem;">
+                <span>Risk Planned:</span>
+                <span class="bold" style="color: ${!t.checklistItems || t.checklistItems.risk ? 'var(--profit)' : 'var(--loss)'}">${!t.checklistItems || t.checklistItems.risk ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+          </div>
           ${screenshotMarkup}
         </div>
       </td>
@@ -607,6 +635,16 @@ export function openTradeModal(id = null) {
   document.getElementById("tradeIntervention").value = "early_profit";
   document.getElementById("tradeMaxPrice").value = "";
   document.getElementById("tradeMinPrice").value = "";
+  
+  // Reset checklist elements
+  const chkItems = ["chkTrend", "chkLevel", "chkVolume", "chkTrigger", "chkRisk"];
+  chkItems.forEach(chkId => {
+    const el = document.getElementById(chkId);
+    if (el) el.checked = false;
+  });
+  const liveAdherence = document.getElementById("liveAdherenceScore");
+  if (liveAdherence) liveAdherence.textContent = "0%";
+
   updateOverridePnlUI();
   updateDirectionUI();
   updateStatusUI();
@@ -642,6 +680,17 @@ export function openTradeModal(id = null) {
       const hasInt = trade.interventionType && trade.interventionType !== "followed";
       document.getElementById("tradeHasIntervention").checked = hasInt;
       document.getElementById("tradeIntervention").value = hasInt ? trade.interventionType : (trade.status === "skipped" ? "skipped_invalid" : "early_profit");
+      
+      if (trade.checklistItems) {
+        document.getElementById("chkTrend").checked = !!trade.checklistItems.trend;
+        document.getElementById("chkLevel").checked = !!trade.checklistItems.level;
+        document.getElementById("chkVolume").checked = !!trade.checklistItems.volume;
+        document.getElementById("chkTrigger").checked = !!trade.checklistItems.trigger;
+        document.getElementById("chkRisk").checked = !!trade.checklistItems.risk;
+      }
+      const score = trade.adherenceScore != null ? trade.adherenceScore : 0;
+      const liveAdherenceEl = document.getElementById("liveAdherenceScore");
+      if (liveAdherenceEl) liveAdherenceEl.textContent = `${score}%`;
       
       updateOverridePnlUI();
       updateDirectionUI();
@@ -1013,6 +1062,40 @@ export function setupUIListeners() {
     });
   }
 
+  // Share Calendar Exporter
+  const shareCalendarBtn = document.getElementById("shareCalendarBtn");
+  if (shareCalendarBtn) {
+    shareCalendarBtn.addEventListener("click", () => {
+      const wrapper = document.querySelector(".calendar-wrapper");
+      if (!wrapper) return;
+
+      // Hide the share button during snapshot to avoid clutter
+      shareCalendarBtn.style.visibility = "hidden";
+
+      // Determine background color based on theme
+      const bgColor = getComputedStyle(document.body).getPropertyValue("--bg-dashboard").trim() || "#0c0c0e";
+
+      html2canvas(wrapper, {
+        backgroundColor: bgColor,
+        scale: 2, // High resolution export
+        useCORS: true,
+        logging: false
+      }).then(canvas => {
+        const link = document.createElement("a");
+        const monthLabel = document.getElementById("calendarMonthLabel")?.textContent || "monthly";
+        const formattedLabel = monthLabel.toLowerCase().replace(/\s+/g, "-");
+        link.download = `trading-calendar-${formattedLabel}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        showToast("Calendar captured and downloaded successfully!", "success");
+      }).catch(err => {
+        showToast("Failed to export calendar: " + err.message, "error");
+      }).finally(() => {
+        shareCalendarBtn.style.visibility = "visible";
+      });
+    });
+  }
+
   // Account Switcher selector
   const accountSelector = document.getElementById("accountSelector");
   if (accountSelector) {
@@ -1110,6 +1193,23 @@ export function setupUIListeners() {
     });
   }
 
+  // Checklist live updates listener
+  const chkItems = ["chkTrend", "chkLevel", "chkVolume", "chkTrigger", "chkRisk"];
+  const liveScoreEl = document.getElementById("liveAdherenceScore");
+  function updateLiveAdherence() {
+    let checked = 0;
+    chkItems.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.checked) checked++;
+    });
+    const score = Math.round((checked / 5) * 100);
+    if (liveScoreEl) liveScoreEl.textContent = `${score}%`;
+  }
+  chkItems.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", updateLiveAdherence);
+  });
+
   // Trade Form submit
   const form = document.getElementById("tradeForm");
   if (form) {
@@ -1117,6 +1217,17 @@ export function setupUIListeners() {
       e.preventDefault();
       
       const isOverridden = document.getElementById("overridePnlToggle").checked;
+      
+      const checklistItems = {
+        trend: document.getElementById("chkTrend").checked,
+        level: document.getElementById("chkLevel").checked,
+        volume: document.getElementById("chkVolume").checked,
+        trigger: document.getElementById("chkTrigger").checked,
+        risk: document.getElementById("chkRisk").checked
+      };
+      const checkedCount = Object.values(checklistItems).filter(Boolean).length;
+      const adherenceScore = Math.round((checkedCount / 5) * 100);
+
       const tradeData = {
         symbol: document.getElementById("tradeSymbol").value,
         direction: currentDirection,
@@ -1140,7 +1251,9 @@ export function setupUIListeners() {
         manualPnl: isOverridden ? parseFloat(document.getElementById("tradeManualPnl").value) || 0 : null,
         interventionType: document.getElementById("tradeHasIntervention").checked ? document.getElementById("tradeIntervention").value : "followed",
         maxPrice: document.getElementById("tradeMaxPrice").value ? parseFloat(document.getElementById("tradeMaxPrice").value) : null,
-        minPrice: document.getElementById("tradeMinPrice").value ? parseFloat(document.getElementById("tradeMinPrice").value) : null
+        minPrice: document.getElementById("tradeMinPrice").value ? parseFloat(document.getElementById("tradeMinPrice").value) : null,
+        checklistItems,
+        adherenceScore
       };
 
       if (!tradeData.symbol) {

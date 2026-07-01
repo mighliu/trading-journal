@@ -298,6 +298,26 @@ class StateManager {
         }
       }
 
+      // Generate realistic mock entry checklist adherence values for demo data
+      const choices = [
+        { trend: true, level: true, volume: true, trigger: true, risk: true },     // 100%
+        { trend: true, level: true, volume: true, trigger: true, risk: false },    // 80%
+        { trend: true, level: true, volume: false, trigger: true, risk: true },    // 80%
+        { trend: true, level: false, volume: true, trigger: true, risk: false },   // 60%
+        { trend: false, level: true, volume: false, trigger: true, risk: true },   // 60%
+        { trend: false, level: false, volume: true, trigger: false, risk: true },  // 40%
+        { trend: false, level: true, volume: false, trigger: false, risk: false }, // 20%
+        { trend: false, level: false, volume: false, trigger: false, risk: false } // 0%
+      ];
+      let checklistVal;
+      if (t.mistake) {
+        checklistVal = choices[4 + Math.floor(Math.random() * 4)]; // 0% - 60%
+      } else {
+        checklistVal = choices[Math.floor(Math.random() * 5)]; // 60% - 100%
+      }
+      const checkedCount = Object.values(checklistVal).filter(Boolean).length;
+      const adherenceScore = Math.round((checkedCount / 5) * 100);
+
       return {
         ...t,
         signalEntryPrice: sigEntry,
@@ -307,7 +327,9 @@ class StateManager {
         accountId: t.accountId || "Personal",
         mistake: t.mistake || "",
         assetClass: t.assetClass || assetClass,
-        status: t.status || "executed"
+        status: t.status || "executed",
+        checklistItems: t.checklistItems || checklistVal,
+        adherenceScore: t.adherenceScore != null ? t.adherenceScore : adherenceScore
       };
     });
 

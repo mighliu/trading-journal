@@ -2330,5 +2330,136 @@ export function renderTimelineReplayChart(trades) {
   });
 }
 
+export function renderAdherencePerformanceChart(trades) {
+  const canvasId = "adherencePerformanceChart";
+  destroyChart(canvasId);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const highTrades = [];
+  const medTrades = [];
+  const lowTrades = [];
+
+  trades.forEach(t => {
+    if (t.status === "skipped") return;
+    const score = t.adherenceScore !== undefined && t.adherenceScore !== null ? t.adherenceScore : 100;
+    if (score >= 80) {
+      highTrades.push(t);
+    } else if (score >= 40) {
+      medTrades.push(t);
+    } else {
+      lowTrades.push(t);
+    }
+  });
+
+  const avgPnls = [getAvgPnl(highTrades), getAvgPnl(medTrades), getAvgPnl(lowTrades)];
+  const winRates = [getWinRate(highTrades), getWinRate(medTrades), getWinRate(lowTrades)];
+  const counts = [highTrades.length, medTrades.length, lowTrades.length];
+
+  function getAvgPnl(arr) {
+    if (arr.length === 0) return 0;
+    const total = arr.reduce((sum, t) => sum + calcNetPnl(t), 0);
+    return parseFloat((total / arr.length).toFixed(2));
+  }
+
+  function getWinRate(arr) {
+    if (arr.length === 0) return 0;
+    const wins = arr.filter(t => calcNetPnl(t) > 0).length;
+    return parseFloat(((wins / arr.length) * 100).toFixed(1));
+  }
+
+  const ctx = canvas.getContext("2d");
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: [
+        `High [80-100%] (${counts[0]} trades)`,
+        `Medium [40-60%] (${counts[1]} trades)`,
+        `Low [0-20%] (${counts[2]} trades)`
+      ],
+      datasets: [
+        {
+          type: "bar",
+          label: "Avg Net P&L ($)",
+          data: avgPnls,
+          backgroundColor: [
+            "rgba(16, 185, 129, 0.15)", // Green for High
+            "rgba(234, 179, 8, 0.15)",  // Yellow for Med
+            "rgba(239, 68, 68, 0.15)"   // Red for Low
+          ],
+          borderColor: [
+            "rgba(16, 185, 129, 0.7)",
+            "rgba(234, 179, 8, 0.7)",
+            "rgba(239, 68, 68, 0.7)"
+          ],
+          borderWidth: 1.5,
+          yAxisID: "yPnl"
+        },
+        {
+          type: "line",
+          label: "Win Rate (%)",
+          data: winRates,
+          borderColor: "var(--accent)",
+          backgroundColor: "rgba(99, 102, 241, 0.1)",
+          borderWidth: 2.5,
+          tension: 0.2,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointHitRadius: 10,
+          yAxisID: "yWinRate"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: "#a1a1aa", font: { family: "Inter" } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const label = context.dataset.label || '';
+              const val = context.parsed.y;
+              if (context.datasetIndex === 0) {
+                return `${label}: ${val >= 0 ? '+' : ''}$${val.toLocaleString()}`;
+              } else {
+                return `${label}: ${val}%`;
+              }
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: getTickColor() }
+        },
+        yPnl: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Average P&L ($)", color: "#a1a1aa" },
+          ticks: {
+            color: getTickColor(),
+            callback: value => `$${value}`
+          },
+          grid: { color: getGridColor() }
+        },
+        yWinRate: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "Win Rate (%)", color: "var(--accent)" },
+          ticks: { color: getTickColor() },
+          grid: { display: false },
+          min: 0,
+          max: 100
+        }
+      }
+    }
+  });
+}
+
 
 
