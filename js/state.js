@@ -148,7 +148,9 @@ class StateManager {
       manualPnl: tradeData.manualPnl != null ? parseFloat(tradeData.manualPnl) : null,
       interventionType: tradeData.interventionType || "followed",
       maxPrice: tradeData.maxPrice != null && tradeData.maxPrice !== "" ? parseFloat(tradeData.maxPrice) : null,
-      minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null
+      minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null,
+      checklistItems: tradeData.checklistItems || null,
+      adherenceScore: tradeData.adherenceScore !== undefined ? tradeData.adherenceScore : null
     };
     
     this.trades.push(trade);
@@ -185,7 +187,9 @@ class StateManager {
       manualPnl: tradeData.manualPnl != null ? parseFloat(tradeData.manualPnl) : null,
       interventionType: tradeData.interventionType || "followed",
       maxPrice: tradeData.maxPrice != null && tradeData.maxPrice !== "" ? parseFloat(tradeData.maxPrice) : null,
-      minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null
+      minPrice: tradeData.minPrice != null && tradeData.minPrice !== "" ? parseFloat(tradeData.minPrice) : null,
+      checklistItems: tradeData.checklistItems !== undefined ? tradeData.checklistItems : this.trades[idx].checklistItems,
+      adherenceScore: tradeData.adherenceScore !== undefined ? tradeData.adherenceScore : this.trades[idx].adherenceScore
     };
     
     this.saveToStorage();
