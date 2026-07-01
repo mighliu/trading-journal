@@ -1902,6 +1902,16 @@ export function renderRMultipleChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
+  const rExpectancy = document.getElementById("rExpectancy");
+  const rAvgWin = document.getElementById("rAvgWin");
+  const rAvgLoss = document.getElementById("rAvgLoss");
+  const rBest = document.getElementById("rBest");
+  const rWorst = document.getElementById("rWorst");
+
+  const rMultiples = [];
+  const wins = [];
+  const losses = [];
+
   const buckets = [
     { label: "<-2R", minVal: -Infinity, maxVal: -2, count: 0 },
     { label: "-2R to -1R", minVal: -2, maxVal: -1, count: 0 },
@@ -1917,6 +1927,13 @@ export function renderRMultipleChart(trades) {
     const rMult = calcRiskReward(t);
     if (rMult === null || isNaN(rMult)) return;
 
+    rMultiples.push(rMult);
+    if (rMult > 0) {
+      wins.push(rMult);
+    } else if (rMult < 0) {
+      losses.push(rMult);
+    }
+
     for (const b of buckets) {
       if (rMult >= b.minVal && rMult < b.maxVal) {
         b.count++;
@@ -1927,9 +1944,31 @@ export function renderRMultipleChart(trades) {
 
   const totalCalculated = buckets.reduce((sum, b) => sum + b.count, 0);
   if (totalCalculated === 0) {
-    renderEmptyChartMessage(canvasId, "No R-Multiple outcomes. Add Stop Loss parameters to trades.");
+    if (rExpectancy) rExpectancy.textContent = "--";
+    if (rAvgWin) rAvgWin.textContent = "--";
+    if (rAvgLoss) rAvgLoss.textContent = "--";
+    if (rBest) rBest.textContent = "--";
+    if (rWorst) rWorst.textContent = "--";
+    renderEmptyChartMessage(canvasId, "No R-Multiple outcomes. Add Stop Loss / MAE parameters to trades.");
     return;
   }
+
+  // Calculate high-level stats
+  const expectancy = rMultiples.reduce((sum, v) => sum + v, 0) / totalCalculated;
+  const avgWinR = wins.length > 0 ? wins.reduce((sum, v) => sum + v, 0) / wins.length : 0;
+  const avgLossR = losses.length > 0 ? losses.reduce((sum, v) => sum + v, 0) / losses.length : 0;
+  const bestR = Math.max(...rMultiples);
+  const worstR = Math.min(...rMultiples);
+
+  // Render stats to DOM elements
+  if (rExpectancy) {
+    rExpectancy.textContent = `${expectancy >= 0 ? "+" : ""}${expectancy.toFixed(2)}R`;
+    rExpectancy.style.color = expectancy >= 0 ? "var(--profit)" : "var(--loss)";
+  }
+  if (rAvgWin) rAvgWin.textContent = `+${avgWinR.toFixed(2)}R`;
+  if (rAvgLoss) rAvgLoss.textContent = `${avgLossR.toFixed(2)}R`;
+  if (rBest) rBest.textContent = `+${bestR.toFixed(2)}R`;
+  if (rWorst) rWorst.textContent = `${worstR.toFixed(2)}R`;
 
   const labels = buckets.map(b => b.label);
   const data = buckets.map(b => b.count);
@@ -1943,13 +1982,13 @@ export function renderRMultipleChart(trades) {
         label: "Trades Count",
         data: data,
         backgroundColor: [
-          "rgba(239, 68, 68, 0.7)",
-          "rgba(239, 68, 68, 0.7)",
-          "rgba(239, 68, 68, 0.5)",
-          "rgba(16, 185, 129, 0.5)",
-          "rgba(16, 185, 129, 0.7)",
-          "rgba(16, 185, 129, 0.8)",
-          "rgba(16, 185, 129, 0.9)"
+          "rgba(239, 68, 68, 0.15)",
+          "rgba(239, 68, 68, 0.15)",
+          "rgba(239, 68, 68, 0.1)",
+          "rgba(16, 185, 129, 0.1)",
+          "rgba(16, 185, 129, 0.15)",
+          "rgba(16, 185, 129, 0.2)",
+          "rgba(16, 185, 129, 0.25)"
         ],
         borderColor: [
           "var(--loss)",
@@ -1968,7 +2007,17 @@ export function renderRMultipleChart(trades) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false }
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: getTooltipBg(),
+          callbacks: {
+            label: function(context) {
+              const count = context.raw;
+              const pct = totalCalculated > 0 ? ((count / totalCalculated) * 100).toFixed(1) : 0;
+              return `Trades: ${count} (${pct}% of total)`;
+            }
+          }
+        }
       },
       scales: {
         x: {
@@ -1980,7 +2029,82 @@ export function renderRMultipleChart(trades) {
           ticks: { color: getTickColor(), stepSize: 1 }
         }
       }
-    }
+    },
+    plugins: [{
+      id: "rCustomIndicators",
+      afterDraw: function(chart) {
+        const chartCtx = chart.ctx;
+        const xAxis = chart.scales.x;
+        const yAxis = chart.scales.y;
+        if (!xAxis || !yAxis) return;
+
+        chartCtx.save();
+
+        // Helper to convert R value to fractional category X coordinate
+        function getPixelForR(val) {
+          let catIdx = 3 + val; // 0R is at start of category index 3
+          catIdx = Math.max(0, Math.min(6, catIdx)); // clamp between category index 0 and 6
+          const lowerIdx = Math.floor(catIdx);
+          const upperIdx = Math.ceil(catIdx);
+          const fraction = catIdx - lowerIdx;
+          
+          const p1 = xAxis.getPixelForValue(lowerIdx);
+          const p2 = xAxis.getPixelForValue(upperIdx);
+          return p1 + fraction * (p2 - p1);
+        }
+
+        // 1. Draw 0R Divider Line (Breakeven)
+        const xMetaLeft = xAxis.getPixelForValue(2);
+        const xMetaRight = xAxis.getPixelForValue(3);
+        const xZero = (xMetaLeft + xMetaRight) / 2;
+        
+        chartCtx.beginPath();
+        chartCtx.strokeStyle = "rgba(161, 161, 170, 0.4)"; // Muted gray
+        chartCtx.lineWidth = 1.5;
+        chartCtx.setLineDash([5, 5]);
+        chartCtx.moveTo(xZero, yAxis.top);
+        chartCtx.lineTo(xZero, yAxis.bottom);
+        chartCtx.stroke();
+
+        chartCtx.fillStyle = "rgba(161, 161, 170, 0.7)";
+        chartCtx.font = "10px sans-serif";
+        chartCtx.fillText("0R (Breakeven)", xZero - 35, yAxis.top - 4);
+
+        // 2. Draw Average Win Line (if > 0)
+        if (avgWinR > 0) {
+          const xWin = getPixelForR(avgWinR);
+          chartCtx.beginPath();
+          chartCtx.strokeStyle = "rgba(16, 185, 129, 0.6)"; // Green
+          chartCtx.lineWidth = 1.5;
+          chartCtx.setLineDash([3, 3]);
+          chartCtx.moveTo(xWin, yAxis.top + 15);
+          chartCtx.lineTo(xWin, yAxis.bottom);
+          chartCtx.stroke();
+
+          chartCtx.fillStyle = "rgba(16, 185, 129, 0.85)";
+          chartCtx.font = "9px sans-serif";
+          chartCtx.fillText(`Avg Win: +${avgWinR.toFixed(1)}R`, xWin + 4, yAxis.top + 25);
+        }
+
+        // 3. Draw Average Loss Line (if < 0)
+        if (avgLossR < 0) {
+          const xLoss = getPixelForR(avgLossR);
+          chartCtx.beginPath();
+          chartCtx.strokeStyle = "rgba(239, 68, 68, 0.6)"; // Red
+          chartCtx.lineWidth = 1.5;
+          chartCtx.setLineDash([3, 3]);
+          chartCtx.moveTo(xLoss, yAxis.top + 15);
+          chartCtx.lineTo(xLoss, yAxis.bottom);
+          chartCtx.stroke();
+
+          chartCtx.fillStyle = "rgba(239, 68, 68, 0.85)";
+          chartCtx.font = "9px sans-serif";
+          chartCtx.fillText(`Avg Loss: ${avgLossR.toFixed(1)}R`, xLoss - 70, yAxis.top + 25);
+        }
+
+        chartCtx.restore();
+      }
+    }]
   });
 }
 
