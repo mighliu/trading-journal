@@ -274,7 +274,13 @@ export function renderDayOfWeekChart(trades) {
   if (!canvas) return;
 
   const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-  const weekdayTotals = [0, 0, 0, 0, 0];
+  const dayStats = [
+    { pnl: 0, count: 0, wins: 0 },
+    { pnl: 0, count: 0, wins: 0 },
+    { pnl: 0, count: 0, wins: 0 },
+    { pnl: 0, count: 0, wins: 0 },
+    { pnl: 0, count: 0, wins: 0 }
+  ];
 
   for (const trade of trades) {
     const exitDate = new Date(trade.exitDateTime);
@@ -284,10 +290,14 @@ export function renderDayOfWeekChart(trades) {
     if (dayIdx === 5) dayIdx = 4;  // Saturday -> Friday
     
     const pnl = getTradePnl(trade);
-    weekdayTotals[dayIdx] += pnl;
+    dayStats[dayIdx].pnl += pnl;
+    dayStats[dayIdx].count++;
+    if (pnl > 0) dayStats[dayIdx].wins++;
   }
 
-  const backgroundColors = weekdayTotals.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const weekdayTotals = dayStats.map(s => s.pnl);
+  const backgroundColors = weekdayTotals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = weekdayTotals.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -297,7 +307,9 @@ export function renderDayOfWeekChart(trades) {
       datasets: [{
         data: weekdayTotals,
         backgroundColor: backgroundColors,
-        borderRadius: 4
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -311,9 +323,18 @@ export function renderDayOfWeekChart(trades) {
           borderWidth: 1,
           callbacks: {
             label: function(context) {
-              const val = context.raw;
-              const sign = val >= 0 ? "+" : "";
-              return `Net P&L: ${sign}$${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              const idx = context.dataIndex;
+              const stats = dayStats[idx];
+              const winRate = stats.count > 0 ? ((stats.wins / stats.count) * 100).toFixed(1) : 0;
+              const avgPnl = stats.count > 0 ? stats.pnl / stats.count : 0;
+              const sign = stats.pnl >= 0 ? "+" : "";
+              const avgSign = avgPnl >= 0 ? "+" : "";
+              return [
+                `Total P&L: ${sign}$${stats.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Trades: ${stats.count} (${stats.wins} Wins, ${stats.count - stats.wins} Losses)`,
+                `Win Rate: ${winRate}%`,
+                `Avg Trade: ${avgSign}$${avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              ];
             }
           }
         }
@@ -343,17 +364,25 @@ export function renderSetupTagChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const setupTotals = {};
+  const setupStats = {};
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     const setup = trade.setup || "No Tag";
-    setupTotals[setup] = (setupTotals[setup] || 0) + getTradePnl(trade);
+    if (!setupStats[setup]) {
+      setupStats[setup] = { pnl: 0, count: 0, wins: 0 };
+    }
+    const net = getTradePnl(trade);
+    setupStats[setup].pnl += net;
+    setupStats[setup].count++;
+    if (net > 0) setupStats[setup].wins++;
   }
 
   // Sort setups descending by total P&L
-  const sortedSetups = Object.keys(setupTotals).sort((a, b) => setupTotals[b] - setupTotals[a]);
+  const sortedSetups = Object.keys(setupStats).sort((a, b) => setupStats[b].pnl - setupStats[a].pnl);
   const labels = sortedSetups;
-  const dataValues = sortedSetups.map(s => setupTotals[s]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const dataValues = sortedSetups.map(s => setupStats[s].pnl);
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -363,7 +392,9 @@ export function renderSetupTagChart(trades) {
       datasets: [{
         data: dataValues,
         backgroundColor: backgroundColors,
-        borderRadius: 4
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -378,9 +409,19 @@ export function renderSetupTagChart(trades) {
           borderWidth: 1,
           callbacks: {
             label: function(context) {
-              const val = context.raw;
-              const sign = val >= 0 ? "+" : "";
-              return `Net P&L: ${sign}$${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              const setup = context.label;
+              const stats = setupStats[setup];
+              if (!stats) return "";
+              const winRate = stats.count > 0 ? ((stats.wins / stats.count) * 100).toFixed(1) : 0;
+              const avgPnl = stats.count > 0 ? stats.pnl / stats.count : 0;
+              const sign = stats.pnl >= 0 ? "+" : "";
+              const avgSign = avgPnl >= 0 ? "+" : "";
+              return [
+                `Total P&L: ${sign}$${stats.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Trades: ${stats.count} (${stats.wins} Wins, ${stats.count - stats.wins} Losses)`,
+                `Win Rate: ${winRate}%`,
+                `Avg Trade P&L: ${avgSign}$${avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              ];
             }
           }
         }
@@ -410,24 +451,26 @@ export function renderSymbolChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  // Group by symbol to calculate count and win rate
+  // Group by symbol to calculate count, win rate, and total pnl
   const symbolStats = {};
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     const sym = trade.symbol;
     if (!symbolStats[sym]) {
-      symbolStats[sym] = [];
+      symbolStats[sym] = { trades: [], pnl: 0 };
     }
-    symbolStats[sym].push(trade);
+    symbolStats[sym].trades.push(trade);
+    symbolStats[sym].pnl += getTradePnl(trade);
   }
 
   // Sort symbols by trade count descending, take top 10
   const sortedSymbols = Object.keys(symbolStats)
-    .sort((a, b) => symbolStats[b].length - symbolStats[a].length)
+    .sort((a, b) => symbolStats[b].trades.length - symbolStats[a].trades.length)
     .slice(0, 10);
 
   const labels = sortedSymbols;
-  const countData = sortedSymbols.map(sym => symbolStats[sym].length);
-  const winRateData = sortedSymbols.map(sym => calcWinRate(symbolStats[sym]));
+  const countData = sortedSymbols.map(sym => symbolStats[sym].trades.length);
+  const winRateData = sortedSymbols.map(sym => calcWinRate(symbolStats[sym].trades));
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -438,10 +481,10 @@ export function renderSymbolChart(trades) {
         {
           label: "Trades Count",
           data: countData,
-          backgroundColor: "rgba(99, 102, 241, 0.6)",
+          backgroundColor: "rgba(99, 102, 241, 0.15)",
           borderColor: "#6366f1",
-          borderWidth: 1,
-          borderRadius: 4,
+          borderWidth: 1.5,
+          borderRadius: 6,
           yAxisID: "yCount"
         },
         {
@@ -449,9 +492,10 @@ export function renderSymbolChart(trades) {
           data: winRateData,
           type: "line",
           borderColor: "#10b981",
-          borderWidth: 2,
+          borderWidth: 2.5,
           pointBackgroundColor: "#10b981",
-          pointRadius: 4,
+          pointRadius: 5,
+          pointHoverRadius: 7,
           yAxisID: "yWinRate",
           tension: 0.1
         }
@@ -467,7 +511,26 @@ export function renderSymbolChart(trades) {
         tooltip: {
           backgroundColor: getTooltipBg(),
           borderColor: getTooltipBorder(),
-          borderWidth: 1
+          borderWidth: 1,
+          callbacks: {
+            label: function(context) {
+              const sym = context.label;
+              const stats = symbolStats[sym];
+              if (!stats) return "";
+              const count = stats.trades.length;
+              const winRate = calcWinRate(stats.trades);
+              const pnl = stats.pnl;
+              const avgPnl = count > 0 ? pnl / count : 0;
+              const sign = pnl >= 0 ? "+" : "";
+              const avgSign = avgPnl >= 0 ? "+" : "";
+              return [
+                `Trades: ${count}`,
+                `Win Rate: ${winRate.toFixed(1)}%`,
+                `Total P&L: ${sign}$${pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Avg Trade: ${avgSign}$${avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              ];
+            }
+          }
         }
       },
       scales: {
@@ -581,7 +644,9 @@ export function renderDistributionChart(trades) {
           borderWidth: 1,
           callbacks: {
             label: function(context) {
-              return `${context.raw} trades in this range`;
+              const count = context.raw;
+              const pct = pnls.length > 0 ? ((count / pnls.length) * 100).toFixed(1) : 0;
+              return `Trades: ${count} (${pct}% of total)`;
             }
           }
         }
@@ -607,17 +672,23 @@ export function renderMistakeChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const mistakeTotals = {};
+  const mistakeStats = {};
   for (const trade of trades) {
     const mistake = trade.mistake || "Disciplined";
-    mistakeTotals[mistake] = (mistakeTotals[mistake] || 0) + getTradePnl(trade);
+    if (!mistakeStats[mistake]) {
+      mistakeStats[mistake] = { pnl: 0, count: 0 };
+    }
+    const net = getTradePnl(trade);
+    mistakeStats[mistake].pnl += net;
+    mistakeStats[mistake].count++;
   }
 
   // Sort mistakes descending by total P&L (worst mistake showing at bottom or top)
-  const sortedMistakes = Object.keys(mistakeTotals).sort((a, b) => mistakeTotals[b] - mistakeTotals[a]);
+  const sortedMistakes = Object.keys(mistakeStats).sort((a, b) => mistakeStats[b].pnl - mistakeStats[a].pnl);
   const labels = sortedMistakes;
-  const dataValues = sortedMistakes.map(m => mistakeTotals[m]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const dataValues = sortedMistakes.map(m => mistakeStats[m].pnl);
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -627,7 +698,9 @@ export function renderMistakeChart(trades) {
       datasets: [{
         data: dataValues,
         backgroundColor: backgroundColors,
-        borderRadius: 4
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -642,9 +715,17 @@ export function renderMistakeChart(trades) {
           borderWidth: 1,
           callbacks: {
             label: function(context) {
-              const val = context.raw;
-              const sign = val >= 0 ? "+" : "";
-              return `Net P&L: ${sign}$${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              const m = context.label;
+              const stats = mistakeStats[m];
+              if (!stats) return "";
+              const avgCost = stats.count > 0 ? stats.pnl / stats.count : 0;
+              const sign = stats.pnl >= 0 ? "+" : "";
+              const avgSign = avgCost >= 0 ? "+" : "";
+              return [
+                `Total Cost/Profit: ${sign}$${stats.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Occurrences: ${stats.count}`,
+                `Avg Cost/Trade: ${avgSign}$${avgCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              ];
             }
           }
         }
@@ -758,16 +839,23 @@ export function renderHourPnlChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const hourPnlMap = {};
+  const hourStats = {};
   for (const t of trades) {
+    if (t.status === "skipped") continue;
     if (!t.entryDateTime) continue;
     const dateObj = new Date(t.entryDateTime);
     if (isNaN(dateObj.getTime())) continue;
     const hour = dateObj.getHours();
-    hourPnlMap[hour] = (hourPnlMap[hour] || 0) + getTradePnl(t);
+    if (!hourStats[hour]) {
+      hourStats[hour] = { pnl: 0, count: 0, wins: 0 };
+    }
+    const net = getTradePnl(t);
+    hourStats[hour].pnl += net;
+    hourStats[hour].count++;
+    if (net > 0) hourStats[hour].wins++;
   }
 
-  const hours = Object.keys(hourPnlMap).map(Number).sort((a, b) => a - b);
+  const hours = Object.keys(hourStats).map(Number).sort((a, b) => a - b);
   if (hours.length === 0) {
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#a1a1aa";
@@ -782,9 +870,9 @@ export function renderHourPnlChart(trades) {
     const displayHour = h % 12 === 0 ? 12 : h % 12;
     return `${displayHour}:00 ${period}`;
   });
-  const dataValues = hours.map(h => hourPnlMap[h]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = dataValues.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const dataValues = hours.map(h => hourStats[h].pnl);
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -795,8 +883,8 @@ export function renderHourPnlChart(trades) {
         data: dataValues,
         backgroundColor: backgroundColors,
         borderColor: borderColors,
-        borderWidth: 1,
-        borderRadius: 4
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -810,9 +898,20 @@ export function renderHourPnlChart(trades) {
           borderWidth: 1,
           callbacks: {
             label: function(context) {
-              const val = context.raw;
-              const sign = val >= 0 ? "+" : "";
-              return `P&L: ${sign}$${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              const idx = context.dataIndex;
+              const h = hours[idx];
+              const stats = hourStats[h];
+              if (!stats) return "";
+              const winRate = stats.count > 0 ? ((stats.wins / stats.count) * 100).toFixed(1) : 0;
+              const avgPnl = stats.count > 0 ? stats.pnl / stats.count : 0;
+              const sign = stats.pnl >= 0 ? "+" : "";
+              const avgSign = avgPnl >= 0 ? "+" : "";
+              return [
+                `Total P&L: ${sign}$${stats.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Trades: ${stats.count} (${stats.wins} Wins, ${stats.count - stats.wins} Losses)`,
+                `Win Rate: ${winRate}%`,
+                `Avg Trade: ${avgSign}$${avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              ];
             }
           }
         }
@@ -944,29 +1043,32 @@ export function renderAssetClassChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  // Group P&L by asset class
-  const classData = {
-    "Stocks": 0,
-    "Options": 0,
-    "Futures": 0,
-    "Crypto": 0,
-    "Forex": 0
+  const classStats = {
+    "Stocks": { pnl: 0, count: 0, wins: 0 },
+    "Options": { pnl: 0, count: 0, wins: 0 },
+    "Futures": { pnl: 0, count: 0, wins: 0 },
+    "Crypto": { pnl: 0, count: 0, wins: 0 },
+    "Forex": { pnl: 0, count: 0, wins: 0 }
   };
 
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     const rawClass = trade.assetClass || "stocks";
     // Capitalize correctly for display labels
     const formattedClass = rawClass.charAt(0).toUpperCase() + rawClass.slice(1);
     
-    if (classData[formattedClass] !== undefined) {
-      classData[formattedClass] += getTradePnl(trade);
+    if (classStats[formattedClass] !== undefined) {
+      const pnl = getTradePnl(trade);
+      classStats[formattedClass].pnl += pnl;
+      classStats[formattedClass].count++;
+      if (pnl > 0) classStats[formattedClass].wins++;
     }
   }
 
-  const labels = Object.keys(classData);
-  const totals = Object.values(classData);
+  const labels = Object.keys(classStats);
+  const totals = labels.map(l => classStats[l].pnl);
   const backgroundColors = totals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
-  const borderColors = totals.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const borderColors = totals.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -992,9 +1094,19 @@ export function renderAssetClassChart(trades) {
           borderWidth: 1,
           callbacks: {
             label: function(context) {
-              const val = context.raw;
-              const sign = val >= 0 ? "+" : "";
-              return `Net P&L: ${sign}$${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              const label = context.label;
+              const stats = classStats[label];
+              if (!stats) return "";
+              const winRate = stats.count > 0 ? ((stats.wins / stats.count) * 100).toFixed(1) : 0;
+              const avgPnl = stats.count > 0 ? stats.pnl / stats.count : 0;
+              const sign = stats.pnl >= 0 ? "+" : "";
+              const avgSign = avgPnl >= 0 ? "+" : "";
+              return [
+                `Total P&L: ${sign}$${stats.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Trades: ${stats.count} (${stats.wins} Wins, ${stats.count - stats.wins} Losses)`,
+                `Win Rate: ${winRate}%`,
+                `Avg Trade: ${avgSign}$${avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+              ];
             }
           }
         }
@@ -1640,22 +1752,38 @@ export function renderHoldTimeChart(trades) {
 
   const labels = buckets.map(b => b.label);
   const pnlValues = buckets.map(b => b.pnl);
-  const backgroundColors = pnlValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.75)" : "rgba(239, 68, 68, 0.75)");
+  const winRates = buckets.map(b => b.count > 0 ? parseFloat(((b.wins / b.count) * 100).toFixed(1)) : 0);
+  const backgroundColors = pnlValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
   const borderColors = pnlValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
-    type: "bar",
     data: {
       labels: labels,
       datasets: [
         {
-          label: "Net P&L",
+          type: "bar",
+          label: "Total Net P&L ($)",
           data: pnlValues,
           backgroundColor: backgroundColors,
           borderColor: borderColors,
           borderWidth: 1.5,
-          borderRadius: 6
+          borderRadius: 6,
+          yAxisID: "yPnl"
+        },
+        {
+          type: "line",
+          label: "Win Rate (%)",
+          data: winRates,
+          borderColor: "var(--accent)",
+          backgroundColor: "rgba(99, 102, 241, 0.1)",
+          borderWidth: 2.5,
+          tension: 0.2,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: "var(--accent)",
+          pointBorderColor: "#fff",
+          yAxisID: "yWinRate"
         }
       ]
     },
@@ -1663,7 +1791,11 @@ export function renderHoldTimeChart(trades) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: "top",
+          labels: { color: getTickColor(), font: { family: "Inter" }, boxWidth: 12 }
+        },
         tooltip: {
           backgroundColor: getTooltipBg(),
           borderColor: getTooltipBorder(),
@@ -1677,11 +1809,15 @@ export function renderHoldTimeChart(trades) {
             label: function(context) {
               const idx = context.dataIndex;
               const b = buckets[idx];
-              const wr = b.count > 0 ? (b.wins / b.count) * 100 : 0;
+              const wr = b.count > 0 ? ((b.wins / b.count) * 100).toFixed(1) : 0;
+              const avgPnl = b.count > 0 ? b.pnl / b.count : 0;
               const sign = b.pnl >= 0 ? "+" : "";
+              const avgSign = avgPnl >= 0 ? "+" : "";
               return [
-                `Net P&L: ${sign}$${b.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-                `Win Rate: ${wr.toFixed(1)}% (${b.wins}/${b.count} trades)`
+                `Total Net P&L: ${sign}$${b.pnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Win Rate: ${wr}%`,
+                `Trades: ${b.count} (${b.wins} Wins, ${b.count - b.wins} Losses)`,
+                `Avg Trade: ${avgSign}$${avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
               ];
             }
           }
@@ -1692,13 +1828,28 @@ export function renderHoldTimeChart(trades) {
           grid: { display: false },
           ticks: { color: getTickColor(), font: { family: "Inter" } }
         },
-        y: {
+        yPnl: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Net P&L ($)", color: "#a1a1aa", font: { family: "Inter" } },
           grid: { color: getGridColor() },
-          ticks: { color: getTickColor(),
+          ticks: {
+            color: getTickColor(),
             font: { family: "Inter" },
-            callback: function(value) {
-              return `$${value.toLocaleString()}`;
-            }
+            callback: function(value) { return `$${value.toLocaleString()}`; }
+          }
+        },
+        yWinRate: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "Win Rate (%)", color: "#a1a1aa", font: { family: "Inter" } },
+          min: 0,
+          max: 100,
+          grid: { display: false },
+          ticks: {
+            color: getTickColor(),
+            font: { family: "Inter" },
+            callback: function(value) { return value + "%"; }
           }
         }
       }
@@ -2396,6 +2547,24 @@ export function renderPostLossBehaviorChart(trades) {
         legend: {
           display: true,
           labels: { color: "#a1a1aa" }
+        },
+        tooltip: {
+          backgroundColor: getTooltipBg(),
+          borderColor: getTooltipBorder(),
+          borderWidth: 1,
+          callbacks: {
+            label: function(context) {
+              const label = context.label;
+              const isWin = label === "After a Win";
+              const s = isWin ? stats.afterWin : stats.afterLoss;
+              const sign = s.avgPnl >= 0 ? "+" : "";
+              return [
+                `Win Rate: ${s.winRate.toFixed(1)}%`,
+                `Avg P&L: ${sign}$${s.avgPnl.toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+                `Trades: ${s.count} (${s.wins} Wins, ${s.count - s.wins} Losses)`
+              ];
+            }
+          }
         }
       },
       scales: {
