@@ -361,7 +361,7 @@ export function renderTradeLog(trades, page = 1) {
     const durObj = calcDuration(t.entryDateTime, t.exitDateTime);
 
     const tr = document.createElement("tr");
-    tr.className = "trade-row-main";
+    tr.className = `trade-row-main${t.status === "skipped" ? " trade-row-skipped" : ""}`;
     tr.dataset.id = t.id;
 
     const pnlClass = netPnl > 0 ? "profit" : netPnl < 0 ? "loss" : "breakeven";
@@ -406,7 +406,7 @@ export function renderTradeLog(trades, page = 1) {
       <td><i data-lucide="chevron-right" class="row-expand-icon"></i></td>
       <td style="text-align: center; color: var(--text-secondary); font-size: 0.8125rem;">${tradeNumber}</td>
       <td>${dateFormatted}</td>
-      <td class="bold">${escapedSymbol}${slippageIcon}</td>
+      <td class="bold">${escapedSymbol}${t.status === "skipped" ? ' <span class="badge status-skipped">Skipped</span>' : ""}${slippageIcon}</td>
       <td><span class="badge direction-${t.direction}">${t.direction.toUpperCase()}</span></td>
       <td>${t.qty}</td>
       <td>$${t.entryPrice.toFixed(2)}</td>
