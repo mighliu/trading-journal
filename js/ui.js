@@ -956,8 +956,8 @@ export function updateLiveCalc() {
 
     if (liveSignalDiffEl) {
       liveSignalDiffEl.textContent = formatCurrency(diff);
-      // diff < 0 means Signal P&L is less than Actual P&L, which is positive slippage (better)
-      liveSignalDiffEl.className = `live-math-val ${diff < 0 ? "profit" : diff > 0 ? "loss" : ""}`;
+      // diff > 0 means Actual P&L is greater than Signal P&L (saved money / beat the signal)
+      liveSignalDiffEl.className = `live-math-val ${diff > 0 ? "profit" : diff < 0 ? "loss" : ""}`;
     }
   } else {
     if (liveSignalPnlEl) {

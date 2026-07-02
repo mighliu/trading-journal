@@ -112,7 +112,7 @@ export function calcPnlDiff(signalPnl, actualPnl) {
   const sPnl = parseFloat(signalPnl);
   const aPnl = parseFloat(actualPnl);
   if (isNaN(sPnl) || isNaN(aPnl)) return 0;
-  return sPnl - aPnl;
+  return aPnl - sPnl;
 }
 
 export function calcRiskReward(trade, avgLoss = 100) {
