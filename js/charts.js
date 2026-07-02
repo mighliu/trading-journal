@@ -1943,9 +1943,9 @@ export function renderMfeMaeCharts(trades) {
           datasets: [{
             label: "Trades",
             data: dataPoints,
-            backgroundColor: dataPoints.map(p => p.y >= 0 ? getProfitBg(0.85) : getLossBg(0.85)),
-            borderColor: dataPoints.map(p => p.y >= 0 ? getProfitColor() : getLossColor()),
-            borderWidth: 1.5,
+            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)"),
+            borderColor: document.body.classList.contains("light-theme") ? "#ffffff" : "#09090b",
+            borderWidth: 1,
             pointRadius: 6,
             pointHoverRadius: 8
           }]
@@ -2034,9 +2034,9 @@ export function renderMfeMaeCharts(trades) {
           datasets: [{
             label: "Trades",
             data: dataPoints,
-            backgroundColor: dataPoints.map(p => p.y >= 0 ? getProfitBg(0.85) : getLossBg(0.85)),
-            borderColor: dataPoints.map(p => p.y >= 0 ? getProfitColor() : getLossColor()),
-            borderWidth: 1.5,
+            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)"),
+            borderColor: document.body.classList.contains("light-theme") ? "#ffffff" : "#09090b",
+            borderWidth: 1,
             pointRadius: 6,
             pointHoverRadius: 8
           }]
