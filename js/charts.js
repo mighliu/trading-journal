@@ -80,6 +80,51 @@ function getTooltipTextColor() {
   return document.body.classList.contains("light-theme") ? "#18181b" : "#fafafa";
 }
 
+function getProfitColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue("--profit").trim() || "#10b981";
+}
+
+function getLossColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue("--loss").trim() || "#ef4444";
+}
+
+function getAccentColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#6366f1";
+}
+
+function getProfitBg(opacity = 0.6) {
+  const hex = getProfitColor();
+  if (hex.startsWith("#")) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+  return `rgba(16, 185, 129, ${opacity})`;
+}
+
+function getLossBg(opacity = 0.6) {
+  const hex = getLossColor();
+  if (hex.startsWith("#")) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+  return `rgba(239, 68, 68, ${opacity})`;
+}
+
+function getAccentBg(opacity = 0.6) {
+  const hex = getAccentColor();
+  if (hex.startsWith("#")) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  }
+  return `rgba(99, 102, 241, ${opacity})`;
+}
+
 export function renderEquityCurve(trades, startingBalance = 25000) {
   const canvasId = "equityCurveChart";
   destroyChart(canvasId);
@@ -108,12 +153,12 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
   const ctx = canvas.getContext("2d");
   const isProfitable = currentBalance >= startingBalance;
-  const mainColor = isProfitable ? "var(--profit)" : "var(--loss)";
+  const mainColor = isProfitable ? getProfitColor() : getLossColor();
   
   // Create gradient
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 300);
-  gradient.addColorStop(0, isProfitable ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)");
-  gradient.addColorStop(1, "rgba(9, 9, 11, 0.0)");
+  gradient.addColorStop(0, isProfitable ? getProfitBg(0.2) : getLossBg(0.2));
+  gradient.addColorStop(1, isProfitable ? getProfitBg(0.0) : getLossBg(0.0));
 
   chartInstances[canvasId] = new Chart(ctx, {
     type: "line",
@@ -211,8 +256,8 @@ export function renderDailyPnlChart(trades) {
     return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
   });
   const dataValues = sortedDates.map(d => dailyData[d]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = dataValues.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -298,8 +343,8 @@ export function renderDayOfWeekChart(trades) {
   }
 
   const weekdayTotals = dayStats.map(s => s.pnl);
-  const backgroundColors = weekdayTotals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = weekdayTotals.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = weekdayTotals.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = weekdayTotals.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -383,8 +428,8 @@ export function renderSetupTagChart(trades) {
   const sortedSetups = Object.keys(setupStats).sort((a, b) => setupStats[b].pnl - setupStats[a].pnl);
   const labels = sortedSetups;
   const dataValues = sortedSetups.map(s => setupStats[s].pnl);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = dataValues.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -483,8 +528,8 @@ export function renderSymbolChart(trades) {
         {
           label: "Trades Count",
           data: countData,
-          backgroundColor: "rgba(99, 102, 241, 0.6)",
-          borderColor: "var(--accent)",
+          backgroundColor: getAccentBg(0.6),
+          borderColor: getAccentColor(),
           borderWidth: 1.5,
           borderRadius: 6,
           yAxisID: "yCount"
@@ -493,9 +538,9 @@ export function renderSymbolChart(trades) {
           label: "Win Rate %",
           data: winRateData,
           type: "line",
-          borderColor: "var(--profit)",
+          borderColor: getProfitColor(),
           borderWidth: 2.5,
-          pointBackgroundColor: "var(--profit)",
+          pointBackgroundColor: getProfitColor(),
           pointRadius: 5,
           pointHoverRadius: 7,
           yAxisID: "yWinRate",
@@ -618,11 +663,11 @@ export function renderDistributionChart(trades) {
   const backgroundColors = bins.map(b => {
     // If the center of the bin is positive, green, else red
     const avg = (b.min + b.max) / 2;
-    return avg >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
+    return avg >= 0 ? getProfitBg(0.6) : getLossBg(0.6);
   });
   const borderColors = bins.map(b => {
     const avg = (b.min + b.max) / 2;
-    return avg >= 0 ? "var(--profit)" : "var(--loss)";
+    return avg >= 0 ? getProfitColor() : getLossColor();
   });
 
   const ctx = canvas.getContext("2d");
@@ -693,8 +738,8 @@ export function renderMistakeChart(trades) {
   const sortedMistakes = Object.keys(mistakeStats).sort((a, b) => mistakeStats[b].pnl - mistakeStats[a].pnl);
   const labels = sortedMistakes;
   const dataValues = sortedMistakes.map(m => mistakeStats[m].pnl);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = dataValues.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -787,8 +832,8 @@ export function renderSlippageSymbolChart(trades) {
   const sortedSymbols = symbols.sort((a, b) => symbolSlippage[a] - symbolSlippage[b]);
   const labels = sortedSymbols;
   const dataValues = sortedSymbols.map(s => symbolSlippage[s]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = dataValues.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -880,8 +925,8 @@ export function renderHourPnlChart(trades) {
     return `${displayHour}:00 ${period}`;
   });
   const dataValues = hours.map(h => hourStats[h].pnl);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = dataValues.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1076,8 +1121,8 @@ export function renderAssetClassChart(trades) {
 
   const labels = Object.keys(classStats);
   const totals = labels.map(l => classStats[l].pnl);
-  const backgroundColors = totals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = totals.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = totals.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = totals.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1232,22 +1277,22 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
         {
           label: "Actual Performance",
           data: actualData,
-          borderColor: "var(--accent)",
-          backgroundColor: "rgba(99, 102, 241, 0.03)",
+          borderColor: getAccentColor(),
+          backgroundColor: getAccentBg(0.03),
           borderWidth: 2,
           tension: 0.15,
-          pointBackgroundColor: "var(--accent)",
+          pointBackgroundColor: getAccentColor(),
           pointRadius: actualData.length < 20 ? 4 : 1
         },
         {
           label: "Pure Strategy Performance",
           data: strategyData,
-          borderColor: "var(--profit)",
-          backgroundColor: "rgba(16, 185, 129, 0.03)",
+          borderColor: getProfitColor(),
+          backgroundColor: getProfitBg(0.03),
           borderWidth: 2,
           borderDash: [5, 5],
           tension: 0.15,
-          pointBackgroundColor: "var(--profit)",
+          pointBackgroundColor: getProfitColor(),
           pointRadius: strategyData.length < 20 ? 4 : 1
         }
       ]
@@ -1331,8 +1376,8 @@ export function renderInterventionAttributionChart(trades) {
 
   const labels = Object.values(categories);
   const data = Object.keys(categories).map(k => totals[k]);
-  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = data.map(val => val >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = data.map(val => val >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = data.map(val => val >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1427,8 +1472,8 @@ export function renderInterventionHourlyChart(trades) {
   ];
   const keys = [9, 10, 11, 12, 13, 14, 15, 16, "other"];
   const data = keys.map(k => hourlyDeltas[k]);
-  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = data.map(val => val >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = data.map(val => val >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = data.map(val => val >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1533,8 +1578,8 @@ export function renderInterventionStreakChart(trades) {
 
   const labels = Object.values(buckets).map(b => b.label);
   const data = Object.values(buckets).map(b => b.total);
-  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = data.map(val => val >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = data.map(val => val >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = data.map(val => val >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1762,8 +1807,8 @@ export function renderHoldTimeChart(trades) {
   const labels = buckets.map(b => b.label);
   const pnlValues = buckets.map(b => b.pnl);
   const winRates = buckets.map(b => b.count > 0 ? parseFloat(((b.wins / b.count) * 100).toFixed(1)) : 0);
-  const backgroundColors = pnlValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = pnlValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const backgroundColors = pnlValues.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = pnlValues.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1784,13 +1829,13 @@ export function renderHoldTimeChart(trades) {
           type: "line",
           label: "Win Rate (%)",
           data: winRates,
-          borderColor: "var(--accent)",
-          backgroundColor: "rgba(99, 102, 241, 0.1)",
+          borderColor: getAccentColor(),
+          backgroundColor: getAccentBg(0.1),
           borderWidth: 2.5,
           tension: 0.2,
           pointRadius: 5,
           pointHoverRadius: 7,
-          pointBackgroundColor: "var(--accent)",
+          pointBackgroundColor: getAccentColor(),
           pointBorderColor: "#fff",
           yAxisID: "yWinRate"
         }
@@ -1898,8 +1943,8 @@ export function renderMfeMaeCharts(trades) {
           datasets: [{
             label: "Trades",
             data: dataPoints,
-            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
-            borderColor: dataPoints.map(p => p.y >= 0 ? "var(--profit)" : "var(--loss)"),
+            backgroundColor: dataPoints.map(p => p.y >= 0 ? getProfitBg(0.6) : getLossBg(0.6)),
+            borderColor: dataPoints.map(p => p.y >= 0 ? getProfitColor() : getLossColor()),
             borderWidth: 1,
             pointRadius: 6,
             pointHoverRadius: 8
@@ -1989,8 +2034,8 @@ export function renderMfeMaeCharts(trades) {
           datasets: [{
             label: "Trades",
             data: dataPoints,
-            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
-            borderColor: dataPoints.map(p => p.y >= 0 ? "var(--profit)" : "var(--loss)"),
+            backgroundColor: dataPoints.map(p => p.y >= 0 ? getProfitBg(0.6) : getLossBg(0.6)),
+            borderColor: dataPoints.map(p => p.y >= 0 ? getProfitColor() : getLossColor()),
             borderWidth: 1,
             pointRadius: 6,
             pointHoverRadius: 8
@@ -2147,22 +2192,22 @@ export function renderRMultipleChart(trades) {
         label: "Trades Count",
         data: data,
         backgroundColor: [
-          "rgba(239, 68, 68, 0.6)",
-          "rgba(239, 68, 68, 0.6)",
-          "rgba(239, 68, 68, 0.5)",
-          "rgba(16, 185, 129, 0.5)",
-          "rgba(16, 185, 129, 0.6)",
-          "rgba(16, 185, 129, 0.7)",
-          "rgba(16, 185, 129, 0.8)"
+          getLossBg(0.6),
+          getLossBg(0.6),
+          getLossBg(0.5),
+          getProfitBg(0.5),
+          getProfitBg(0.6),
+          getProfitBg(0.7),
+          getProfitBg(0.8)
         ],
         borderColor: [
-          "var(--loss)",
-          "var(--loss)",
-          "var(--loss)",
-          "var(--profit)",
-          "var(--profit)",
-          "var(--profit)",
-          "var(--profit)"
+          getLossColor(),
+          getLossColor(),
+          getLossColor(),
+          getProfitColor(),
+          getProfitColor(),
+          getProfitColor(),
+          getProfitColor()
         ],
         borderWidth: 1.5,
         borderRadius: 4
@@ -2415,8 +2460,8 @@ export function renderTradeSequenceChart(trades) {
   const labels = buckets.map(b => b.label);
   const pnlData = buckets.map(b => b.pnl);
   const winRates = buckets.map(b => b.count > 0 ? parseFloat(((b.wins / b.count) * 100).toFixed(1)) : 0);
-  const colors = pnlData.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
-  const borderColors = pnlData.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
+  const colors = pnlData.map(v => v >= 0 ? getProfitBg(0.6) : getLossBg(0.6));
+  const borderColors = pnlData.map(v => v >= 0 ? getProfitColor() : getLossColor());
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -2437,13 +2482,13 @@ export function renderTradeSequenceChart(trades) {
           type: "line",
           label: "Win Rate (%)",
           data: winRates,
-          borderColor: "var(--accent)",
-          backgroundColor: "rgba(99, 102, 241, 0.1)",
+          borderColor: getAccentColor(),
+          backgroundColor: getAccentBg(0.1),
           borderWidth: 2.5,
           tension: 0.2,
           pointRadius: 5,
           pointHoverRadius: 7,
-          pointBackgroundColor: "var(--accent)",
+          pointBackgroundColor: getAccentColor(),
           pointBorderColor: "#fff",
           yAxisID: "yWinRate"
         }
