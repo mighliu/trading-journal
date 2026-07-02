@@ -1351,9 +1351,18 @@ export function setupUIListeners() {
 
       console.log("Form submit: currentEditId =", currentEditId, "tradeData =", tradeData);
       try {
+        // Automatically switch Status filter to match the saved trade so it is instantly visible
+        const currentFilterStatus = AppState.activeFilters.status || "executed";
+        if (currentFilterStatus !== "all" && currentFilterStatus !== tradeData.status) {
+          AppState.activeFilters.status = tradeData.status;
+          const statusSelector = document.getElementById("filterStatus");
+          if (statusSelector) {
+            statusSelector.value = tradeData.status;
+          }
+        }
+
         if (currentEditId) {
           AppState.updateTrade(currentEditId, tradeData);
-          console.log("After updateTrade inside state:", AppState.trades.find(t => t.id === currentEditId));
           showToast("Trade updated successfully.", "success");
         } else {
           AppState.addTrade(tradeData);
