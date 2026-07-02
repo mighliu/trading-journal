@@ -786,7 +786,7 @@ input:focus, select:focus, textarea:focus {
   margin-top: 16px;
 }
 
-/* Calendar Styles (TradeZella Style) */
+/* Calendar Styles */
 .calendar-wrapper {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
