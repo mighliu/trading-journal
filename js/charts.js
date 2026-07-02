@@ -17,9 +17,6 @@ import { AppState } from './state.js';
 const chartInstances = {};
 
 function getTradePnl(t) {
-  if (t.status === "skipped") {
-    return calcSignalPnl(t) || 0;
-  }
   return calcNetPnl(t);
 }
 
@@ -133,7 +130,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
   if (!canvas) return;
 
   // Sort trades by exit datetime ascending
-  const sortedTrades = [...trades].sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+  const sortedTrades = [...trades].filter(t => t.status !== "skipped").sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   let currentBalance = startingBalance;
   const labels = ["Start"];
@@ -244,6 +241,7 @@ export function renderDailyPnlChart(trades) {
   // Group P&L by Date (YYYY-MM-DD)
   const dailyData = {};
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     const dateStr = trade.exitDateTime.split("T")[0];
     const pnl = calcNetPnl(trade);
     dailyData[dateStr] = (dailyData[dateStr] || 0) + pnl;
@@ -330,6 +328,7 @@ export function renderDayOfWeekChart(trades) {
   ];
 
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     const exitDate = new Date(trade.exitDateTime);
     let dayIdx = exitDate.getDay() - 1; // 0 = Monday, 4 = Friday
     // Map Sunday/Saturday to closest week days if they occur (crypto swing trades exit on weekends)
@@ -613,7 +612,7 @@ export function renderDistributionChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const pnls = trades.map(t => getTradePnl(t));
+  const pnls = trades.filter(t => t.status !== "skipped").map(t => getTradePnl(t));
   if (pnls.length === 0) return;
 
   // Let's create bin ranges (e.g. $100 buckets or automated)
@@ -725,6 +724,7 @@ export function renderMistakeChart(trades) {
 
   const mistakeStats = {};
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     const mistake = trade.mistake || "Disciplined";
     if (!mistakeStats[mistake]) {
       mistakeStats[mistake] = { pnl: 0, count: 0 };
@@ -808,6 +808,7 @@ export function renderSlippageSymbolChart(trades) {
 
   const symbolSlippage = {};
   for (const trade of trades) {
+    if (trade.status === "skipped") continue;
     if (trade.signalEntryPrice != null || trade.signalExitPrice != null) {
       const actPnl = calcNetPnl(trade);
       const sigPnl = calcSignalPnl(trade);
@@ -998,7 +999,7 @@ export function renderCumulativeSlippageChart(trades) {
 
   // Filter trades that have at least one signal parameter defined
   const sigTrades = trades
-    .filter(t => t.signalEntryPrice != null || t.signalExitPrice != null)
+    .filter(t => t.status !== "skipped" && (t.signalEntryPrice != null || t.signalExitPrice != null))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sigTrades.length === 0) {
@@ -1924,6 +1925,7 @@ export function renderMfeMaeCharts(trades) {
   if (mfeCanvas) {
     const dataPoints = [];
     trades.forEach(t => {
+      if (t.status === "skipped") return;
       const mfe = calcMfe(t);
       const pnl = calcNetPnl(t);
       if (mfe !== null && !isNaN(mfe)) {
@@ -2015,6 +2017,7 @@ export function renderMfeMaeCharts(trades) {
   if (maeCanvas) {
     const dataPoints = [];
     trades.forEach(t => {
+      if (t.status === "skipped") return;
       const mae = calcMae(t);
       const pnl = calcNetPnl(t);
       if (mae !== null && !isNaN(mae)) {
