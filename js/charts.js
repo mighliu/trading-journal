@@ -211,7 +211,7 @@ export function renderDailyPnlChart(trades) {
     return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
   });
   const dataValues = sortedDates.map(d => dailyData[d]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -298,7 +298,7 @@ export function renderDayOfWeekChart(trades) {
   }
 
   const weekdayTotals = dayStats.map(s => s.pnl);
-  const backgroundColors = weekdayTotals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = weekdayTotals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = weekdayTotals.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -383,7 +383,7 @@ export function renderSetupTagChart(trades) {
   const sortedSetups = Object.keys(setupStats).sort((a, b) => setupStats[b].pnl - setupStats[a].pnl);
   const labels = sortedSetups;
   const dataValues = sortedSetups.map(s => setupStats[s].pnl);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -483,8 +483,8 @@ export function renderSymbolChart(trades) {
         {
           label: "Trades Count",
           data: countData,
-          backgroundColor: "rgba(99, 102, 241, 0.15)",
-          borderColor: "#6366f1",
+          backgroundColor: "rgba(99, 102, 241, 0.6)",
+          borderColor: "var(--accent)",
           borderWidth: 1.5,
           borderRadius: 6,
           yAxisID: "yCount"
@@ -493,9 +493,9 @@ export function renderSymbolChart(trades) {
           label: "Win Rate %",
           data: winRateData,
           type: "line",
-          borderColor: "#10b981",
+          borderColor: "var(--profit)",
           borderWidth: 2.5,
-          pointBackgroundColor: "#10b981",
+          pointBackgroundColor: "var(--profit)",
           pointRadius: 5,
           pointHoverRadius: 7,
           yAxisID: "yWinRate",
@@ -618,7 +618,7 @@ export function renderDistributionChart(trades) {
   const backgroundColors = bins.map(b => {
     // If the center of the bin is positive, green, else red
     const avg = (b.min + b.max) / 2;
-    return avg >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)";
+    return avg >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
   });
   const borderColors = bins.map(b => {
     const avg = (b.min + b.max) / 2;
@@ -693,7 +693,7 @@ export function renderMistakeChart(trades) {
   const sortedMistakes = Object.keys(mistakeStats).sort((a, b) => mistakeStats[b].pnl - mistakeStats[a].pnl);
   const labels = sortedMistakes;
   const dataValues = sortedMistakes.map(m => mistakeStats[m].pnl);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -787,7 +787,7 @@ export function renderSlippageSymbolChart(trades) {
   const sortedSymbols = symbols.sort((a, b) => symbolSlippage[a] - symbolSlippage[b]);
   const labels = sortedSymbols;
   const dataValues = sortedSymbols.map(s => symbolSlippage[s]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -880,7 +880,7 @@ export function renderHourPnlChart(trades) {
     return `${displayHour}:00 ${period}`;
   });
   const dataValues = hours.map(h => hourStats[h].pnl);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -1076,7 +1076,7 @@ export function renderAssetClassChart(trades) {
 
   const labels = Object.keys(classStats);
   const totals = labels.map(l => classStats[l].pnl);
-  const backgroundColors = totals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = totals.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = totals.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -1331,8 +1331,8 @@ export function renderInterventionAttributionChart(trades) {
 
   const labels = Object.values(categories);
   const data = Object.keys(categories).map(k => totals[k]);
-  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)");
-  const borderColors = data.map(val => val >= 0 ? "#10b981" : "#ef4444");
+  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
+  const borderColors = data.map(val => val >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1427,8 +1427,8 @@ export function renderInterventionHourlyChart(trades) {
   ];
   const keys = [9, 10, 11, 12, 13, 14, 15, 16, "other"];
   const data = keys.map(k => hourlyDeltas[k]);
-  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)");
-  const borderColors = data.map(val => val >= 0 ? "#10b981" : "#ef4444");
+  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
+  const borderColors = data.map(val => val >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1533,8 +1533,8 @@ export function renderInterventionStreakChart(trades) {
 
   const labels = Object.values(buckets).map(b => b.label);
   const data = Object.values(buckets).map(b => b.total);
-  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.2)" : "rgba(239, 68, 68, 0.2)");
-  const borderColors = data.map(val => val >= 0 ? "#10b981" : "#ef4444");
+  const backgroundColors = data.map(val => val >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
+  const borderColors = data.map(val => val >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -1762,7 +1762,7 @@ export function renderHoldTimeChart(trades) {
   const labels = buckets.map(b => b.label);
   const pnlValues = buckets.map(b => b.pnl);
   const winRates = buckets.map(b => b.count > 0 ? parseFloat(((b.wins / b.count) * 100).toFixed(1)) : 0);
-  const backgroundColors = pnlValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const backgroundColors = pnlValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = pnlValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
@@ -1898,7 +1898,7 @@ export function renderMfeMaeCharts(trades) {
           datasets: [{
             label: "Trades",
             data: dataPoints,
-            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)"),
+            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
             borderColor: dataPoints.map(p => p.y >= 0 ? "var(--profit)" : "var(--loss)"),
             borderWidth: 1,
             pointRadius: 6,
@@ -1989,7 +1989,7 @@ export function renderMfeMaeCharts(trades) {
           datasets: [{
             label: "Trades",
             data: dataPoints,
-            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)"),
+            backgroundColor: dataPoints.map(p => p.y >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
             borderColor: dataPoints.map(p => p.y >= 0 ? "var(--profit)" : "var(--loss)"),
             borderWidth: 1,
             pointRadius: 6,
@@ -2532,7 +2532,7 @@ export function renderPostLossBehaviorChart(trades) {
         {
           label: "Win Rate (%)",
           data: winRates,
-          backgroundColor: "rgba(99, 102, 241, 0.7)",
+          backgroundColor: "rgba(99, 102, 241, 0.6)",
           borderColor: "var(--accent)",
           borderWidth: 1.5,
           yAxisID: "yWR",
@@ -2541,7 +2541,7 @@ export function renderPostLossBehaviorChart(trades) {
         {
           label: "Avg P&L ($)",
           data: avgPnls,
-          backgroundColor: avgPnls.map(v => v >= 0 ? "rgba(16, 185, 129, 0.7)" : "rgba(239, 68, 68, 0.7)"),
+          backgroundColor: avgPnls.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
           borderColor: avgPnls.map(v => v >= 0 ? "var(--profit)" : "var(--loss)"),
           borderWidth: 1.5,
           yAxisID: "yPnl",
@@ -2593,7 +2593,7 @@ export function renderPostLossBehaviorChart(trades) {
         yPnl: {
           type: "linear",
           position: "right",
-          title: { display: true, text: "Avg P&L ($)", color: "#10b981" },
+          title: { display: true, text: "Avg P&L ($)", color: "var(--profit)" },
           ticks: { color: getTickColor() },
           grid: { display: false }
         }
@@ -2693,7 +2693,7 @@ export function renderTimelineReplayChart(trades) {
       datasets: [{
         label: "Hold Timeline",
         data: datasetsData,
-        backgroundColor: dayTrades.map(t => calcNetPnl(t) >= 0 ? "rgba(16, 185, 129, 0.75)" : "rgba(239, 68, 68, 0.75)"),
+        backgroundColor: dayTrades.map(t => calcNetPnl(t) >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
         borderColor: dayTrades.map(t => calcNetPnl(t) >= 0 ? "var(--profit)" : "var(--loss)"),
         borderWidth: 1.5,
         borderRadius: 4
@@ -2800,14 +2800,14 @@ export function renderAdherencePerformanceChart(trades) {
           label: "Avg Net P&L ($)",
           data: avgPnls,
           backgroundColor: [
-            "rgba(16, 185, 129, 0.15)", // Green for High
-            "rgba(234, 179, 8, 0.15)",  // Yellow for Med
-            "rgba(239, 68, 68, 0.15)"   // Red for Low
+            "rgba(16, 185, 129, 0.6)", // Green for High
+            "rgba(234, 179, 8, 0.6)",  // Yellow for Med
+            "rgba(239, 68, 68, 0.6)"   // Red for Low
           ],
           borderColor: [
-            "rgba(16, 185, 129, 0.7)",
-            "rgba(234, 179, 8, 0.7)",
-            "rgba(239, 68, 68, 0.7)"
+            "var(--profit)",
+            "rgba(234, 179, 8, 1.0)",
+            "var(--loss)"
           ],
           borderWidth: 1.5,
           yAxisID: "yPnl"
