@@ -108,7 +108,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
   const ctx = canvas.getContext("2d");
   const isProfitable = currentBalance >= startingBalance;
-  const mainColor = isProfitable ? "#10b981" : "#ef4444";
+  const mainColor = isProfitable ? "var(--profit)" : "var(--loss)";
   
   // Create gradient
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 300);
@@ -211,7 +211,8 @@ export function renderDailyPnlChart(trades) {
     return dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
   });
   const dataValues = sortedDates.map(d => dailyData[d]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -222,8 +223,9 @@ export function renderDailyPnlChart(trades) {
         label: "Daily P&L",
         data: dataValues,
         backgroundColor: backgroundColors,
-        borderRadius: 4,
-        borderWidth: 0
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -616,7 +618,11 @@ export function renderDistributionChart(trades) {
   const backgroundColors = bins.map(b => {
     // If the center of the bin is positive, green, else red
     const avg = (b.min + b.max) / 2;
-    return avg >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
+    return avg >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)";
+  });
+  const borderColors = bins.map(b => {
+    const avg = (b.min + b.max) / 2;
+    return avg >= 0 ? "var(--profit)" : "var(--loss)";
   });
 
   const ctx = canvas.getContext("2d");
@@ -628,9 +634,9 @@ export function renderDistributionChart(trades) {
         label: "Trade Outcomes",
         data: dataValues,
         backgroundColor: backgroundColors,
-        borderColor: backgroundColors.map(c => c.replace("0.6", "1.0")),
-        borderWidth: 1,
-        borderRadius: 4
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -781,7 +787,8 @@ export function renderSlippageSymbolChart(trades) {
   const sortedSymbols = symbols.sort((a, b) => symbolSlippage[a] - symbolSlippage[b]);
   const labels = sortedSymbols;
   const dataValues = sortedSymbols.map(s => symbolSlippage[s]);
-  const backgroundColors = dataValues.map(v => v >= 0 ? "#10b981" : "#ef4444");
+  const backgroundColors = dataValues.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const borderColors = dataValues.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
   chartInstances[canvasId] = new Chart(ctx, {
@@ -791,7 +798,9 @@ export function renderSlippageSymbolChart(trades) {
       datasets: [{
         data: dataValues,
         backgroundColor: backgroundColors,
-        borderRadius: 4
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 6
       }]
     },
     options: {
@@ -978,10 +987,10 @@ export function renderCumulativeSlippageChart(trades) {
 
   const ctx = canvas.getContext("2d");
 
-  // Create blue gradient
+  // Create accent gradient
   const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-  gradient.addColorStop(0, "rgba(59, 130, 246, 0.25)");
-  gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
+  gradient.addColorStop(0, "rgba(99, 102, 241, 0.25)");
+  gradient.addColorStop(1, "rgba(99, 102, 241, 0.0)");
 
   chartInstances[canvasId] = new Chart(ctx, {
     type: "line",
@@ -990,12 +999,12 @@ export function renderCumulativeSlippageChart(trades) {
       datasets: [{
         label: "Cumulative Slippage",
         data: dataPoints,
-        borderColor: "#3b82f6",
+        borderColor: "var(--accent)",
         borderWidth: 2,
         fill: true,
         backgroundColor: gradient,
         tension: 0.2,
-        pointBackgroundColor: "#3b82f6",
+        pointBackgroundColor: "var(--accent)",
         pointRadius: dataPoints.length < 15 ? 4 : 2
       }]
     },
@@ -1223,22 +1232,22 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
         {
           label: "Actual Performance",
           data: actualData,
-          borderColor: "#c084fc",
-          backgroundColor: "rgba(192, 132, 252, 0.03)",
+          borderColor: "var(--accent)",
+          backgroundColor: "rgba(99, 102, 241, 0.03)",
           borderWidth: 2,
           tension: 0.15,
-          pointBackgroundColor: "#c084fc",
+          pointBackgroundColor: "var(--accent)",
           pointRadius: actualData.length < 20 ? 4 : 1
         },
         {
           label: "Pure Strategy Performance",
           data: strategyData,
-          borderColor: "#3b82f6",
-          backgroundColor: "rgba(59, 130, 246, 0.03)",
+          borderColor: "var(--profit)",
+          backgroundColor: "rgba(16, 185, 129, 0.03)",
           borderWidth: 2,
           borderDash: [5, 5],
           tension: 0.15,
-          pointBackgroundColor: "#3b82f6",
+          pointBackgroundColor: "var(--profit)",
           pointRadius: strategyData.length < 20 ? 4 : 1
         }
       ]
