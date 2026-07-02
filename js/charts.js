@@ -2147,19 +2147,19 @@ export function renderRMultipleChart(trades) {
         label: "Trades Count",
         data: data,
         backgroundColor: [
-          "rgba(239, 68, 68, 0.15)",
-          "rgba(239, 68, 68, 0.15)",
-          "rgba(239, 68, 68, 0.1)",
-          "rgba(16, 185, 129, 0.1)",
-          "rgba(16, 185, 129, 0.15)",
-          "rgba(16, 185, 129, 0.2)",
-          "rgba(16, 185, 129, 0.25)"
+          "rgba(239, 68, 68, 0.6)",
+          "rgba(239, 68, 68, 0.6)",
+          "rgba(239, 68, 68, 0.5)",
+          "rgba(16, 185, 129, 0.5)",
+          "rgba(16, 185, 129, 0.6)",
+          "rgba(16, 185, 129, 0.7)",
+          "rgba(16, 185, 129, 0.8)"
         ],
         borderColor: [
           "var(--loss)",
           "var(--loss)",
-          "rgba(239, 68, 68, 0.8)",
-          "rgba(16, 185, 129, 0.8)",
+          "var(--loss)",
+          "var(--profit)",
           "var(--profit)",
           "var(--profit)",
           "var(--profit)"
@@ -2415,7 +2415,7 @@ export function renderTradeSequenceChart(trades) {
   const labels = buckets.map(b => b.label);
   const pnlData = buckets.map(b => b.pnl);
   const winRates = buckets.map(b => b.count > 0 ? parseFloat(((b.wins / b.count) * 100).toFixed(1)) : 0);
-  const colors = pnlData.map(v => v >= 0 ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)");
+  const colors = pnlData.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)");
   const borderColors = pnlData.map(v => v >= 0 ? "var(--profit)" : "var(--loss)");
 
   const ctx = canvas.getContext("2d");
