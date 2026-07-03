@@ -1265,16 +1265,20 @@ export function calcFatiguePivotData(trades) {
 
   const sequenceExpectancies = {};
   const sequenceCounts = {};
-  
+  const sequenceWinRates = {};
+
   for (let s = 1; s <= 5; s++) {
     const group = sequenceGroups[s];
     if (group.length > 0) {
       const totalPnl = group.reduce((sum, t) => sum + calcNetPnl(t), 0);
+      const wins = group.filter(t => calcNetPnl(t) > 0).length;
       sequenceExpectancies[s] = totalPnl / group.length;
       sequenceCounts[s] = group.length;
+      sequenceWinRates[s] = (wins / group.length) * 100;
     } else {
       sequenceExpectancies[s] = 0;
       sequenceCounts[s] = 0;
+      sequenceWinRates[s] = null; // null = no data for that bucket
     }
   }
 
@@ -1299,6 +1303,7 @@ export function calcFatiguePivotData(trades) {
   return {
     sequenceExpectancies,
     sequenceCounts,
+    sequenceWinRates,
     pivot
   };
 }

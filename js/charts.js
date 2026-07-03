@@ -3604,22 +3604,10 @@ export function renderFatiguePivotChart(trades) {
 
   const data = calcFatiguePivotData(trades);
   const labels = ["1st Trade", "2nd Trade", "3rd Trade", "4th Trade", "5th+ Trade"];
-  
-  const expectations = [
-    data.sequenceExpectancies[1],
-    data.sequenceExpectancies[2],
-    data.sequenceExpectancies[3],
-    data.sequenceExpectancies[4],
-    data.sequenceExpectancies[5]
-  ];
 
-  const counts = [
-    data.sequenceCounts[1],
-    data.sequenceCounts[2],
-    data.sequenceCounts[3],
-    data.sequenceCounts[4],
-    data.sequenceCounts[5]
-  ];
+  const expectations = [1, 2, 3, 4, 5].map(s => data.sequenceExpectancies[s]);
+  const counts      = [1, 2, 3, 4, 5].map(s => data.sequenceCounts[s]);
+  const winRates    = [1, 2, 3, 4, 5].map(s => data.sequenceWinRates[s]);   // null when no data
 
   const hasData = counts.some(c => c > 0);
   if (!hasData) {
@@ -3633,35 +3621,65 @@ export function renderFatiguePivotChart(trades) {
   }
 
   const isLight = document.body.classList.contains("light-theme");
-  
-  const barBackgrounds = expectations.map(exp => {
-    if (exp >= 0) {
-      return isLight ? "rgba(16, 185, 129, 0.7)" : "rgba(16, 185, 129, 0.75)";
-    } else {
-      return isLight ? "rgba(239, 68, 68, 0.7)" : "rgba(242, 54, 69, 0.75)";
-    }
-  });
 
-  const barBorders = expectations.map(exp => (exp >= 0 ? "#10b981" : (isLight ? "#ef4444" : "#f23645")));
+  const barBackgrounds = expectations.map(exp =>
+    exp >= 0
+      ? (isLight ? "rgba(16, 185, 129, 0.65)" : "rgba(16, 185, 129, 0.7)")
+      : (isLight ? "rgba(239, 68, 68, 0.65)"  : "rgba(242, 54, 69, 0.7)")
+  );
+  const barBorders = expectations.map(exp =>
+    exp >= 0 ? "#10b981" : (isLight ? "#ef4444" : "#f23645")
+  );
+
+  const lineColor = isLight ? "rgba(99, 102, 241, 0.9)" : "rgba(139, 92, 246, 0.9)";
 
   chartInstances[canvasId] = new Chart(ctx, {
-    type: "bar",
     data: {
-      labels: labels,
-      datasets: [{
-        label: "Expectancy ($/trade)",
-        data: expectations,
-        backgroundColor: barBackgrounds,
-        borderColor: barBorders,
-        borderWidth: 1.5,
-        borderRadius: 4
-      }]
+      labels,
+      datasets: [
+        {
+          type: "bar",
+          label: "Expectancy ($/trade)",
+          data: expectations,
+          backgroundColor: barBackgrounds,
+          borderColor: barBorders,
+          borderWidth: 1.5,
+          borderRadius: 4,
+          yAxisID: "y"
+        },
+        {
+          type: "line",
+          label: "Win Rate (%)",
+          data: winRates,
+          borderColor: lineColor,
+          backgroundColor: isLight ? "rgba(99, 102, 241, 0.1)" : "rgba(139, 92, 246, 0.1)",
+          borderWidth: 2,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: lineColor,
+          pointBorderColor: isLight ? "#fff" : "#09090b",
+          pointBorderWidth: 1.5,
+          tension: 0.35,
+          spanGaps: false,   // gaps where bucket has no data (null)
+          yAxisID: "y2"
+        }
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: "top",
+          labels: {
+            color: getTickColor(),
+            font: { family: "Inter, sans-serif", size: 10 },
+            usePointStyle: true,
+            pointStyleWidth: 8
+          }
+        },
         tooltip: {
           backgroundColor: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(18, 18, 18, 0.98)",
           titleColor: isLight ? "#18181b" : "#f4f4f5",
@@ -3671,18 +3689,25 @@ export function renderFatiguePivotChart(trades) {
           padding: 10,
           displayColors: false,
           callbacks: {
+            title: (items) => labels[items[0].dataIndex],
             label: function(context) {
               const idx = context.dataIndex;
-              const val = expectations[idx];
               const cnt = counts[idx];
+              if (cnt === 0) return null;   // suppress empty buckets
               const formatVal = (n) => {
-                const absVal = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                return n >= 0 ? `$${absVal}` : `-$${absVal}`;
+                const abs = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return n >= 0 ? `$${abs}` : `-$${abs}`;
               };
-              return [
-                `Avg Expectancy: ${formatVal(val)}`,
-                `Total Trades: ${cnt}`
-              ];
+              if (context.dataset.label.startsWith("Expect")) {
+                return `Avg Expectancy: ${formatVal(expectations[idx])}`;
+              } else {
+                const wr = winRates[idx];
+                return wr !== null ? `Win Rate: ${wr.toFixed(1)}%` : null;
+              }
+            },
+            afterBody: (items) => {
+              const idx = items[0].dataIndex;
+              return [`Trades: ${counts[idx]}`];
             }
           }
         }
@@ -3693,6 +3718,7 @@ export function renderFatiguePivotChart(trades) {
           ticks: { color: getTickColor() }
         },
         y: {
+          position: "left",
           title: {
             display: true,
             text: "Expectancy ($/trade)",
@@ -3706,6 +3732,22 @@ export function renderFatiguePivotChart(trades) {
               const sign = value >= 0 ? "" : "-";
               return `${sign}$${Math.abs(value).toLocaleString()}`;
             }
+          }
+        },
+        y2: {
+          position: "right",
+          min: 0,
+          max: 100,
+          title: {
+            display: true,
+            text: "Win Rate (%)",
+            color: isLight ? "#71717a" : "#a1a1aa",
+            font: { family: "Inter, sans-serif", size: 10, weight: "bold" }
+          },
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: isLight ? "rgba(99, 102, 241, 0.8)" : "rgba(139, 92, 246, 0.8)",
+            callback: value => `${value}%`
           }
         }
       }
