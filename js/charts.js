@@ -179,21 +179,30 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
   // ── Compute macro swing phases (Drawdown vs Run-up recovery) ───────────────
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
+  const threshold = (parseFloat(startingBalance) || 25000) * 0.006;
 
   let peakVal = lineData[0];
   let peakIdx = 0;
+  let maxDrop = 0;
 
   for (let i = 1; i < lineData.length; i++) {
     const val = lineData[i];
     if (val < peakVal) {
-      // Mark all steps from the peak to this drop as Red (Drawdown)
-      for (let j = peakIdx; j < i; j++) {
-        stepColors[j] = getLossColor();
+      const drop = peakVal - val;
+      if (drop > maxDrop) {
+        maxDrop = drop;
+      }
+      // Only trigger drawdown if the drop exceeds our threshold
+      if (maxDrop >= threshold) {
+        for (let j = peakIdx; j < i; j++) {
+          stepColors[j] = getLossColor();
+        }
       }
     } else {
       // Recovered or new peak!
       peakVal = val;
       peakIdx = i;
+      maxDrop = 0;
     }
   }
   // ────────────────────────────────────────────────────────────────────────────
