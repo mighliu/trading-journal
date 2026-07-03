@@ -1999,10 +1999,15 @@ export function renderRiskTab(trades) {
   const riskExpectedWinStreak = document.getElementById("riskExpectedWinStreak");
   const riskExpectedLossStreak = document.getElementById("riskExpectedLossStreak");
   
+  const riskMaxDeclineDays = document.getElementById("riskMaxDeclineDays");
+  const riskMaxDeclineTrades = document.getElementById("riskMaxDeclineTrades");
+
   if (riskMaxDdDays) riskMaxDdDays.textContent = `${dds.maxCompletedDays.toFixed(1)} Days`;
   if (riskMaxDdTrades) riskMaxDdTrades.textContent = `${dds.maxCompletedTrades} Trades`;
+  if (riskMaxDeclineDays) riskMaxDeclineDays.textContent = `${dds.maxDeclineDays.toFixed(1)} Days`;
+  if (riskMaxDeclineTrades) riskMaxDeclineTrades.textContent = `${dds.maxDeclineTrades} Trades`;
   if (riskCurrentDdDuration) {
-    riskCurrentDdDuration.textContent = `${dds.currentDrawdownDays.toFixed(1)} Days (${dds.currentDrawdownTrades} trades)`;
+    riskCurrentDdDuration.textContent = `${dds.currentDrawdownDays.toFixed(1)} Days (${dds.currentDrawdownTrades} trades; Decline: ${dds.currentDeclineDays.toFixed(1)} days / ${dds.currentDeclineTrades} trades)`;
     if (dds.currentDrawdownTrades > 10 || dds.currentDrawdownDays > 14) {
       riskCurrentDdDuration.className = "bold loss";
       riskCurrentDdDuration.style.color = "";

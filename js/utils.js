@@ -834,65 +834,108 @@ export function calcPostLossPerformance(trades) {
 
 export function calcDrawdownDurations(trades, startingBalance = 25000) {
   const sorted = [...trades]
-    .filter(t => t.status === "executed")
-    .sort((a, b) => new Date(a.entryDateTime) - new Date(b.entryDateTime));
+    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
     
+  if (sorted.length === 0) {
+    return {
+      maxCompletedTrades: 0,
+      maxCompletedDays: 0,
+      maxDeclineTrades: 0,
+      maxDeclineDays: 0,
+      currentDrawdownTrades: 0,
+      currentDrawdownDays: 0,
+      currentDeclineTrades: 0,
+      currentDeclineDays: 0
+    };
+  }
+
   let current = startingBalance;
-  let peak = startingBalance;
-  let peakIndex = -1;
-  let peakTime = sorted.length > 0 ? sorted[0].entryDateTime : null;
-  let inDrawdown = false;
-  let drawdownStart = null;
-  
-  const durations = []; // objects of { peak, maxDd, tradeCount, days }
-  
-  sorted.forEach((t, i) => {
-    const net = calcNetPnl(t);
-    current += net;
-    
-    if (current < peak) {
-      if (!inDrawdown) {
-        inDrawdown = true;
-        drawdownStart = peakIndex === -1 ? (sorted.length > 0 ? sorted[0].entryDateTime : null) : peakTime;
-      }
-    }
-    
-    if (current >= peak) {
-      if (inDrawdown && i > peakIndex) {
-        // Recovered! Record duration of drawdown
-        const timeDiffDays = drawdownStart ? (new Date(t.exitDateTime) - new Date(drawdownStart)) / (1000 * 60 * 60 * 24) : 0;
-        durations.push({
-          peak,
-          tradeCount: i - peakIndex,
-          days: Math.max(0.1, parseFloat(timeDiffDays.toFixed(2)))
-        });
-      }
-      peak = current;
-      peakIndex = i;
-      peakTime = t.exitDateTime;
-      inDrawdown = false;
-      drawdownStart = null;
-    }
+  const lineData = [startingBalance];
+  sorted.forEach(t => {
+    current += calcNetPnl(t);
+    lineData.push(current);
   });
-  
-  // If currently in drawdown
-  let currentDrawdownTrades = 0;
-  let currentDrawdownDays = 0;
-  if (inDrawdown || peakIndex < sorted.length - 1) {
-    currentDrawdownTrades = sorted.length - 1 - peakIndex;
-    const lastExit = new Date(sorted[sorted.length - 1].exitDateTime);
-    const startOfDd = peakIndex === -1 ? (sorted.length > 0 ? sorted[0].entryDateTime : null) : drawdownStart;
-    if (startOfDd) {
-      currentDrawdownDays = Math.max(0.1, (lastExit - new Date(startOfDd)) / (1000 * 60 * 60 * 24));
+
+  const athIndices = [0];
+  let runningMax = lineData[0];
+  for (let i = 1; i < lineData.length; i++) {
+    if (lineData[i] > runningMax) {
+      athIndices.push(i);
+      runningMax = lineData[i];
     }
   }
+
+  const hasCurrentDd = athIndices[athIndices.length - 1] !== lineData.length - 1;
+  if (hasCurrentDd) {
+    athIndices.push(lineData.length - 1);
+  }
+
+  const getDateOfIdx = (idx) => {
+    if (idx === 0) {
+      return new Date(sorted[0].exitDateTime);
+    }
+    return new Date(sorted[idx - 1].exitDateTime);
+  };
+
+  const completedRecovery = [];
+  const completedDecline = [];
   
+  let currentDrawdownTrades = 0;
+  let currentDrawdownDays = 0;
+  let currentDeclineTrades = 0;
+  let currentDeclineDays = 0;
+
+  for (let k = 0; k < athIndices.length - 1; k++) {
+    const idx1 = athIndices[k];
+    const idx2 = athIndices[k + 1];
+    
+    // Find absolute minimum in [idx1, idx2]
+    let troughIdx = idx1;
+    let minVal = lineData[idx1];
+    for (let j = idx1 + 1; j <= idx2; j++) {
+      if (lineData[j] < minVal) {
+        minVal = lineData[j];
+        troughIdx = j;
+      }
+    }
+
+    const isLastInterval = (k === athIndices.length - 2);
+    const isOngoing = isLastInterval && hasCurrentDd;
+
+    const standardTrades = idx2 - idx1;
+    const standardDays = Math.max(0.1, (getDateOfIdx(idx2) - getDateOfIdx(idx1)) / (1000 * 60 * 60 * 24));
+    
+    const declineTrades = troughIdx - idx1;
+    const declineDays = Math.max(0.1, (getDateOfIdx(troughIdx) - getDateOfIdx(idx1)) / (1000 * 60 * 60 * 24));
+
+    if (isOngoing) {
+      currentDrawdownTrades = standardTrades;
+      currentDrawdownDays = standardDays;
+      currentDeclineTrades = declineTrades;
+      currentDeclineDays = declineDays;
+    } else {
+      if (standardTrades > 0) {
+        completedRecovery.push({ trades: standardTrades, days: standardDays });
+        completedDecline.push({ trades: declineTrades, days: declineDays });
+      }
+    }
+  }
+
+  const maxCompletedTrades = completedRecovery.reduce((max, d) => Math.max(max, d.trades), 0);
+  const maxCompletedDays = completedRecovery.reduce((max, d) => Math.max(max, d.days), 0);
+  const maxDeclineTrades = completedDecline.reduce((max, d) => Math.max(max, d.trades), 0);
+  const maxDeclineDays = completedDecline.reduce((max, d) => Math.max(max, d.days), 0);
+
   return {
-    completedDurations: durations,
-    maxCompletedTrades: durations.reduce((max, d) => Math.max(max, d.tradeCount), 0),
-    maxCompletedDays: durations.reduce((max, d) => Math.max(max, d.days), 0),
+    maxCompletedTrades,
+    maxCompletedDays: parseFloat(maxCompletedDays.toFixed(1)),
+    maxDeclineTrades,
+    maxDeclineDays: parseFloat(maxDeclineDays.toFixed(1)),
     currentDrawdownTrades,
-    currentDrawdownDays: parseFloat(currentDrawdownDays.toFixed(2))
+    currentDrawdownDays: parseFloat(currentDrawdownDays.toFixed(1)),
+    currentDeclineTrades,
+    currentDeclineDays: parseFloat(currentDeclineDays.toFixed(1))
   };
 }
 
