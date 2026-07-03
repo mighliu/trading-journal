@@ -3381,8 +3381,9 @@ export function renderDrawdownScatterChart(trades, startingBalance = 25000) {
         backgroundColor: pointBgColor,
         borderColor: pointBorderColor,
         borderWidth: 1.5,
-        pointRadius: 6,
-        pointHoverRadius: 8,
+        pointRadius: 7,
+        pointHoverRadius: 10,
+        pointHitRadius: 25,
         pointHoverBackgroundColor: pointBorderColor,
         pointHoverBorderColor: "#fff",
         pointHoverBorderWidth: 2
@@ -3391,6 +3392,11 @@ export function renderDrawdownScatterChart(trades, startingBalance = 25000) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "nearest",
+        intersect: false,
+        axis: "xy"
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
