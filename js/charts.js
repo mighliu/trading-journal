@@ -177,66 +177,14 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
-  // ── Compute macro swing phases using a ZigZag algorithm ────────────────────
+  // ── Color each step by individual trade outcome (win = green, loss = red) ──
+  // This matches TradingView's run-up/drawdown definition: consecutive winning
+  // trades form a green segment; consecutive losing trades form a red segment.
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
-
-  // Auto-calibrate threshold to the actual data range so we get macro swings
-  const dataMin = Math.min(...lineData);
-  const dataMax = Math.max(...lineData);
-  const dataRange = dataMax - dataMin;
-  // Use 12% of the total range — gives roughly 5–10 swings regardless of scale
-  const threshold = dataRange > 0 ? dataRange * 0.12 : (parseFloat(startingBalance) || 25000) * 0.03;
-
-  let lastExtremeVal = lineData[0];
-  let lastExtremeIdx = 0;
-  let trend = 0; // +1 for up, -1 for down, 0 for initial
-  
-  const swingPoints = [{ index: 0, value: lineData[0], type: "start" }];
-
   for (let i = 1; i < lineData.length; i++) {
-    const val = lineData[i];
-    const diff = val - lastExtremeVal;
-
-    if (trend === 0) {
-      if (diff >= threshold) {
-        trend = 1;
-        lastExtremeVal = val;
-        lastExtremeIdx = i;
-      } else if (diff <= -threshold) {
-        trend = -1;
-        lastExtremeVal = val;
-        lastExtremeIdx = i;
-      }
-    } else if (trend === 1) {
-      if (val > lastExtremeVal) {
-        lastExtremeVal = val;
-        lastExtremeIdx = i;
-      } else if (diff <= -threshold) {
-        swingPoints.push({ index: lastExtremeIdx, value: lastExtremeVal, type: "peak" });
-        trend = -1;
-        lastExtremeVal = val;
-        lastExtremeIdx = i;
-      }
-    } else if (trend === -1) {
-      if (val < lastExtremeVal) {
-        lastExtremeVal = val;
-        lastExtremeIdx = i;
-      } else if (diff >= threshold) {
-        swingPoints.push({ index: lastExtremeIdx, value: lastExtremeVal, type: "trough" });
-        trend = 1;
-        lastExtremeVal = val;
-        lastExtremeIdx = i;
-      }
-    }
-  }
-  swingPoints.push({ index: lineData.length - 1, value: lineData[lineData.length - 1], type: trend === 1 ? "peak" : (trend === -1 ? "trough" : "end") });
-
-  for (let k = 0; k < swingPoints.length - 1; k++) {
-    const from = swingPoints[k];
-    const to = swingPoints[k + 1];
-    const color = (to.value < from.value) ? getLossColor() : getProfitColor();
-    for (let j = from.index; j < to.index; j++) {
-      stepColors[j] = color;
+    const tradePnl = barData[i]; // null for the Start point
+    if (tradePnl !== null) {
+      stepColors[i - 1] = tradePnl >= 0 ? getProfitColor() : getLossColor();
     }
   }
   // ────────────────────────────────────────────────────────────────────────────
