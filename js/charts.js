@@ -177,23 +177,24 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
-  // ── Color each step by the NET P&L of that trade's exit DAY ─────────────────
-  // All trades on a day with net profit → green (run-up).
-  // All trades on a day with net loss   → red  (drawdown).
-  // This groups intraday trades into a single color block per day, matching
-  // TradingView's run-up / drawdown visualization on the bottom timeline bar.
-  const dayNetPnl = {};
-  for (const trade of sortedTrades) {
-    const dateKey = new Date(trade.exitDateTime).toISOString().slice(0, 10);
-    dayNetPnl[dateKey] = (dayNetPnl[dateKey] || 0) + calcNetPnl(trade);
-  }
-
+  // ── Color each step using the running-maximum (all-time-high) approach ───────
+  // GREEN  = equity is at or above its all-time high → run-up / new high territory
+  // RED    = equity is below its all-time high       → drawdown territory
+  //
+  // This matches TradingView exactly: during a sustained uptrend every winning
+  // trade pushes equity to a new high → long green segment; a significant decline
+  // keeps equity below the peak → long red segment; isolated losses in an
+  // uptrend create only a brief red blip before the next winner makes a new high.
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
+  let runningMax = lineData[0]; // 0 at start (cumulative P&L baseline)
+
   for (let i = 1; i < lineData.length; i++) {
-    const trade = sortedTrades[i - 1];
-    const dateKey = new Date(trade.exitDateTime).toISOString().slice(0, 10);
-    const dayPnl = dayNetPnl[dateKey] ?? 0;
-    stepColors[i - 1] = dayPnl >= 0 ? getProfitColor() : getLossColor();
+    if (lineData[i] >= runningMax) {
+      stepColors[i - 1] = getProfitColor(); // at or above all-time high
+      runningMax = lineData[i];             // update the peak
+    } else {
+      stepColors[i - 1] = getLossColor();   // in drawdown below peak
+    }
   }
   // ────────────────────────────────────────────────────────────────────────────
 
