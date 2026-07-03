@@ -122,6 +122,29 @@ class StateManager {
     }
   }
 
+  isDuplicateTrade(newTrade) {
+    return this.trades.some(t => {
+      if (newTrade.id && t.id === newTrade.id) return true;
+
+      const entryA = new Date(t.entryDateTime).getTime();
+      const entryB = new Date(newTrade.entryDateTime).getTime();
+      const exitA = new Date(t.exitDateTime).getTime();
+      const exitB = new Date(newTrade.exitDateTime).getTime();
+
+      const sameEntry = Math.abs(entryA - entryB) < 1500; // 1.5 seconds tolerance
+      const sameExit = Math.abs(exitA - exitB) < 1500;
+
+      return t.symbol === newTrade.symbol &&
+             t.direction === newTrade.direction &&
+             sameEntry &&
+             sameExit &&
+             Math.abs(t.entryPrice - newTrade.entryPrice) < 0.0001 &&
+             Math.abs(t.exitPrice - newTrade.exitPrice) < 0.0001 &&
+             Math.abs(t.qty - newTrade.qty) < 0.0001 &&
+             (t.accountId || "Personal") === (newTrade.accountId || "Personal");
+    });
+  }
+
   addTrade(tradeData) {
     const trade = {
       id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
@@ -580,9 +603,13 @@ class StateManager {
             mae: t.mae != null ? parseFloat(t.mae) : null
           }));
           
-          this.trades = [...this.trades, ...validated];
-          this.saveToStorage();
-          resolve(validated.length);
+          // Filter out duplicates
+          const newTrades = validated.filter(t => !this.isDuplicateTrade(t));
+          if (newTrades.length > 0) {
+            this.trades = [...this.trades, ...newTrades];
+            this.saveToStorage();
+          }
+          resolve(newTrades.length);
         } catch (err) {
           reject(new Error("Failed to parse JSON file: " + err.message));
         }
@@ -660,9 +687,13 @@ class StateManager {
             });
           }
 
-          this.trades = [...this.trades, ...importedTrades];
-          this.saveToStorage();
-          resolve(importedTrades.length);
+          // Filter out duplicates
+          const newTrades = importedTrades.filter(t => !this.isDuplicateTrade(t));
+          if (newTrades.length > 0) {
+            this.trades = [...this.trades, ...newTrades];
+            this.saveToStorage();
+          }
+          resolve(newTrades.length);
         } catch (err) {
           reject(new Error("Failed to parse CSV file: " + err.message));
         }
@@ -933,9 +964,13 @@ class StateManager {
             return reject(new Error("No valid trades found in Excel sheet."));
           }
           
-          this.trades = [...this.trades, ...importedTrades];
-          this.saveToStorage();
-          resolve(importedTrades.length);
+          // Filter out duplicates
+          const newTrades = importedTrades.filter(t => !this.isDuplicateTrade(t));
+          if (newTrades.length > 0) {
+            this.trades = [...this.trades, ...newTrades];
+            this.saveToStorage();
+          }
+          resolve(newTrades.length);
         } catch (err) {
           reject(new Error("Failed to parse Excel file: " + err.message));
         }
