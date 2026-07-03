@@ -209,8 +209,8 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           segment: {
           borderColor: ctx => {
             if (ctx.p0DataIndex === undefined || ctx.p1DataIndex === undefined) return mainColor;
-            const p0 = ctx.dataset.data[ctx.p0DataIndex];
-            const p1 = ctx.dataset.data[ctx.p1DataIndex];
+            const p0 = lineData[ctx.p0DataIndex];
+            const p1 = lineData[ctx.p1DataIndex];
             return ((p0 + p1) / 2) >= 0 ? getProfitColor() : getLossColor();
           }
           },
