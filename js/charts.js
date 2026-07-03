@@ -334,9 +334,18 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
       const y = chart.chartArea.bottom - 6;
 
       c.save();
-      c.lineWidth = 6;
-      c.lineCap = "square";
+      
+      // 1. Draw subtle background track spanning the entire grid width
+      c.lineWidth = 10;
+      c.lineCap = "butt";
+      c.beginPath();
+      c.strokeStyle = document.body.classList.contains("light-theme") ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.08)";
+      c.moveTo(chart.chartArea.left, y);
+      c.lineTo(chart.chartArea.right, y);
+      c.stroke();
 
+      // 2. Draw the colored segments
+      c.lineCap = "square";
       for (let i = 0; i < lineData.length - 1; i++) {
         const x1 = getX(i);
         const x2 = getX(i + 1);
@@ -374,6 +383,10 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
         if (xStart !== null && xEnd !== null) {
           c.save();
+
+          // 0. Draw subtle semi-transparent background shading overlay for the hovered region
+          c.fillStyle = isLoss ? getLossBg(0.04) : getProfitBg(0.04);
+          c.fillRect(xStart, chart.chartArea.top, xEnd - xStart, chart.chartArea.bottom - chart.chartArea.top);
 
           // 1. Draw boundary vertical dotted lines
           c.beginPath();
@@ -482,18 +495,17 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           borderColor: mainColor,
           borderWidth: 2,
           segment: {
-            borderColor: ctx => {
-              if (ctx.p0DataIndex === undefined) return mainColor;
-              return stepColors[ctx.p0DataIndex] || mainColor;
-            }
+          borderColor: ctx => {
+            if (ctx.p0DataIndex === undefined || ctx.p1DataIndex === undefined) return mainColor;
+            const p0 = lineData[ctx.p0DataIndex];
+            const p1 = lineData[ctx.p1DataIndex];
+            return ((p0 + p1) / 2) >= 0 ? getProfitColor() : getLossColor();
+          }
           },
           backgroundColor: gradient,
           fill: true,
           tension: 0.15,
-          pointBackgroundColor: lineData.map((v, i) => {
-            if (i === 0) return getProfitColor();
-            return stepColors[i - 1] || getProfitColor();
-          }),
+          pointBackgroundColor: lineData.map(v => v >= 0 ? getProfitColor() : getLossColor()),
           pointBorderColor: "#09090b",
           pointBorderWidth: 1.5,
           pointRadius: lineData.length > 50 ? 0 : 4,
