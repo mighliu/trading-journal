@@ -3466,30 +3466,30 @@ export function renderHoldTimeScatterChart(trades) {
     return;
   }
 
-  const winPoints = [];
-  const lossPoints = [];
+  // Sort executed trades globally to ensure trade number consistency
+  const allExecuted = AppState.trades
+    .filter(x => x.status === "executed")
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+
+  const dataPoints = [];
 
   executed.forEach(t => {
     if (!t.entryDateTime || !t.exitDateTime) return;
     const durationMins = (new Date(t.exitDateTime) - new Date(t.entryDateTime)) / (1000 * 60);
     const pnl = calcNetPnl(t);
 
-    const pt = {
+    const globalIdx = allExecuted.findIndex(x => x.id === t.id);
+    const tradeNo = globalIdx !== -1 ? globalIdx + 1 : null;
+
+    dataPoints.push({
       x: parseFloat(durationMins.toFixed(1)),
       y: pnl,
-      meta: {
-        symbol: t.symbol,
-        direction: t.direction,
-        setup: t.setup || "Unspecified",
-        exitDate: new Date(t.exitDateTime).toLocaleDateString()
-      }
-    };
-
-    if (pnl >= 0) {
-      winPoints.push(pt);
-    } else {
-      lossPoints.push(pt);
-    }
+      symbol: t.symbol,
+      direction: t.direction,
+      setup: t.setup || "Unspecified",
+      exitDate: new Date(t.exitDateTime).toLocaleDateString(),
+      tradeNo: tradeNo
+    });
   });
 
   const ctx = canvas.getContext("2d");
@@ -3498,38 +3498,24 @@ export function renderHoldTimeScatterChart(trades) {
   }
 
   const isLight = document.body.classList.contains("light-theme");
-  const winColor = isLight ? "rgba(16, 185, 129, 0.65)" : "rgba(16, 185, 129, 0.7)";
-  const lossColor = isLight ? "rgba(239, 68, 68, 0.65)" : "rgba(242, 54, 69, 0.7)";
+  const winColor = isLight ? "rgba(16, 185, 129, 0.7)" : "rgba(16, 185, 129, 0.75)";
+  const lossColor = isLight ? "rgba(239, 68, 68, 0.7)" : "rgba(242, 54, 69, 0.75)";
 
   chartInstances[canvasId] = new Chart(ctx, {
     type: "scatter",
     data: {
       datasets: [
         {
-          label: "Wins",
-          data: winPoints,
-          backgroundColor: winColor,
-          borderColor: "#10b981",
-          borderWidth: 1.5,
-          pointRadius: 6,
-          pointHoverRadius: 9,
-          pointHitRadius: 20,
-          pointHoverBackgroundColor: "#10b981",
+          label: "Trades",
+          data: dataPoints,
+          backgroundColor: dataPoints.map(p => p.y >= 0 ? winColor : lossColor),
+          borderColor: isLight ? "#ffffff" : "#09090b",
+          borderWidth: 1,
+          pointRadius: 7,
+          pointHoverRadius: 10,
+          pointHitRadius: 25,
           pointHoverBorderColor: "#fff",
-          pointHoverBorderWidth: 2
-        },
-        {
-          label: "Losses",
-          data: lossPoints,
-          backgroundColor: lossColor,
-          borderColor: isLight ? "#ef4444" : "#f23645",
-          borderWidth: 1.5,
-          pointRadius: 6,
-          pointHoverRadius: 9,
-          pointHitRadius: 20,
-          pointHoverBackgroundColor: isLight ? "#ef4444" : "#f23645",
-          pointHoverBorderColor: "#fff",
-          pointHoverBorderWidth: 2
+          pointHoverBorderWidth: 1.5
         }
       ]
     },
@@ -3542,14 +3528,7 @@ export function renderHoldTimeScatterChart(trades) {
         axis: "xy"
       },
       plugins: {
-        legend: {
-          display: true,
-          position: "top",
-          labels: {
-            color: getTickColor(),
-            font: { family: "Inter, sans-serif", size: 10 }
-          }
-        },
+        legend: { display: false },
         tooltip: {
           backgroundColor: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(18, 18, 18, 0.98)",
           titleColor: isLight ? "#18181b" : "#f4f4f5",
@@ -3560,8 +3539,9 @@ export function renderHoldTimeScatterChart(trades) {
           displayColors: false,
           callbacks: {
             label: function(context) {
-              const pt = context.raw;
-              const mins = pt.x;
+              const p = context.raw;
+              const numStr = p.tradeNo ? `Trade #${p.tradeNo} ` : "";
+              const mins = p.x;
               let timeStr = `${mins.toFixed(0)}m`;
               if (mins >= 60) {
                 const hrs = Math.floor(mins / 60);
@@ -3573,10 +3553,11 @@ export function renderHoldTimeScatterChart(trades) {
                 return n >= 0 ? `$${absVal}` : `-$${absVal}`;
               };
               return [
-                `${pt.meta.symbol} (${pt.meta.direction.toUpperCase()}) - ${pt.meta.setup}`,
-                `P&L: ${formatVal(pt.y)}`,
-                `Duration: ${timeStr}`,
-                `Exit Date: ${pt.meta.exitDate}`
+                `${numStr}(${p.symbol}) - ${p.setup}`,
+                `Direction: ${p.direction.toUpperCase()}`,
+                `Realized P&L: ${formatVal(p.y)}`,
+                `Hold Time: ${timeStr}`,
+                `Exit Date: ${p.exitDate}`
               ];
             }
           }
