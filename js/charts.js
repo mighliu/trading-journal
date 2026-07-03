@@ -177,32 +177,60 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
-  // ── Compute macro swing phases (Drawdown vs Run-up recovery) ───────────────
+  // ── Compute macro swing phases using a ZigZag algorithm ────────────────────
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
-  const threshold = (parseFloat(startingBalance) || 25000) * 0.006;
+  const threshold = (parseFloat(startingBalance) || 25000) * 0.008;
 
-  let peakVal = lineData[0];
-  let peakIdx = 0;
-  let maxDrop = 0;
+  let lastExtremeVal = lineData[0];
+  let lastExtremeIdx = 0;
+  let trend = 0; // +1 for up, -1 for down, 0 for initial
+  
+  const swingPoints = [{ index: 0, value: lineData[0], type: "start" }];
 
   for (let i = 1; i < lineData.length; i++) {
     const val = lineData[i];
-    if (val < peakVal) {
-      const drop = peakVal - val;
-      if (drop > maxDrop) {
-        maxDrop = drop;
+    const diff = val - lastExtremeVal;
+
+    if (trend === 0) {
+      if (diff >= threshold) {
+        trend = 1;
+        lastExtremeVal = val;
+        lastExtremeIdx = i;
+      } else if (diff <= -threshold) {
+        trend = -1;
+        lastExtremeVal = val;
+        lastExtremeIdx = i;
       }
-      // Only trigger drawdown if the drop exceeds our threshold
-      if (maxDrop >= threshold) {
-        for (let j = peakIdx; j < i; j++) {
-          stepColors[j] = getLossColor();
-        }
+    } else if (trend === 1) {
+      if (val > lastExtremeVal) {
+        lastExtremeVal = val;
+        lastExtremeIdx = i;
+      } else if (diff <= -threshold) {
+        swingPoints.push({ index: lastExtremeIdx, value: lastExtremeVal, type: "peak" });
+        trend = -1;
+        lastExtremeVal = val;
+        lastExtremeIdx = i;
       }
-    } else {
-      // Recovered or new peak!
-      peakVal = val;
-      peakIdx = i;
-      maxDrop = 0;
+    } else if (trend === -1) {
+      if (val < lastExtremeVal) {
+        lastExtremeVal = val;
+        lastExtremeIdx = i;
+      } else if (diff >= threshold) {
+        swingPoints.push({ index: lastExtremeIdx, value: lastExtremeVal, type: "trough" });
+        trend = 1;
+        lastExtremeVal = val;
+        lastExtremeIdx = i;
+      }
+    }
+  }
+  swingPoints.push({ index: lineData.length - 1, value: lineData[lineData.length - 1], type: trend === 1 ? "peak" : (trend === -1 ? "trough" : "end") });
+
+  for (let k = 0; k < swingPoints.length - 1; k++) {
+    const from = swingPoints[k];
+    const to = swingPoints[k + 1];
+    const color = (to.value < from.value) ? getLossColor() : getProfitColor();
+    for (let j = from.index; j < to.index; j++) {
+      stepColors[j] = color;
     }
   }
   // ────────────────────────────────────────────────────────────────────────────
@@ -410,16 +438,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           // Change value (right-aligned)
           const startVal = lineData[startIdx];
           const endVal = lineData[endIdx];
-          let change = endVal - startVal;
-          if (isLoss) {
-            let minVal = startVal;
-            for (let j = startIdx; j <= endIdx; j++) {
-              if (lineData[j] < minVal) {
-                minVal = lineData[j];
-              }
-            }
-            change = minVal - startVal;
-          }
+          const change = endVal - startVal;
           const changeText = (change >= 0 ? "+" : "") + formatCurrency(change);
 
           c.textAlign = "right";
