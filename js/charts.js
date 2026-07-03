@@ -207,12 +207,12 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           borderColor: mainColor,
           borderWidth: 2,
           segment: {
-            borderColor: ctx => {
-              if (!ctx.p0 || !ctx.p1) return mainColor;
-              const p0 = ctx.p0.parsed.y;
-              const p1 = ctx.p1.parsed.y;
-              return ((p0 + p1) / 2) >= 0 ? getProfitColor() : getLossColor();
-            }
+          borderColor: ctx => {
+            if (ctx.p0DataIndex === undefined || ctx.p1DataIndex === undefined) return mainColor;
+            const p0 = ctx.dataset.data[ctx.p0DataIndex];
+            const p1 = ctx.dataset.data[ctx.p1DataIndex];
+            return ((p0 + p1) / 2) >= 0 ? getProfitColor() : getLossColor();
+          }
           },
           backgroundColor: gradient,
           fill: true,
