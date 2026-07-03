@@ -40,6 +40,20 @@ function destroyChart(canvasId) {
 
 export function destroyAllCharts() {
   Object.keys(chartInstances).forEach(canvasId => destroyChart(canvasId));
+  syncChartDefaults();
+}
+
+function syncChartDefaults() {
+  if (typeof Chart === "undefined") return;
+  Chart.defaults.plugins.tooltip.backgroundColor = getTooltipBg();
+  Chart.defaults.plugins.tooltip.titleColor = getTooltipTextColor();
+  Chart.defaults.plugins.tooltip.bodyColor = getTooltipTextColor();
+  Chart.defaults.plugins.tooltip.borderColor = getTooltipBorder();
+  Chart.defaults.plugins.tooltip.borderWidth = 1;
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+  Chart.defaults.plugins.tooltip.titleFont = { family: "Inter, -apple-system, sans-serif", weight: "600", size: 12 };
+  Chart.defaults.plugins.tooltip.bodyFont = { family: "Inter, -apple-system, sans-serif", size: 12 };
 }
 
 function renderEmptyChartMessage(canvasId, message) {
