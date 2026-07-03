@@ -223,7 +223,6 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     id: "swingLines",
     afterDraw(chart) {
       const c      = chart.ctx;
-      const yScale = chart.scales.y;
       const meta0  = chart.getDatasetMeta(0);
       if (!meta0 || !meta0.data || meta0.data.length < 2) return;
 
@@ -232,45 +231,27 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         return pt ? pt.x : null;
       };
 
-      const drawSpan = (si, ei, yValue, lineColor, fillColor) => {
+      const drawSpan = (si, ei, color) => {
         const x1 = getX(si);
         const x2 = getX(ei);
         if (x1 === null || x2 === null || x1 === x2) return;
-        const y    = yScale.getPixelForValue(yValue);
-        const capH = 5;
+        
+        // Position at the very bottom of the chart grid area
+        const y = chart.chartArea.bottom - 6;
 
         c.save();
-
-        // Translucent fill behind line
-        c.fillStyle = fillColor;
-        c.fillRect(x1, y - capH, x2 - x1, capH * 2);
-
-        // Horizontal line
         c.beginPath();
-        c.strokeStyle = lineColor;
-        c.lineWidth = 2;
-        c.setLineDash([]);
+        c.strokeStyle = color;
+        c.lineWidth = 6;
+        c.lineCap = "square";
         c.moveTo(x1, y);
         c.lineTo(x2, y);
         c.stroke();
-
-        // Left end-cap
-        c.beginPath();
-        c.moveTo(x1, y - capH);
-        c.lineTo(x1, y + capH);
-        c.stroke();
-
-        // Right end-cap
-        c.beginPath();
-        c.moveTo(x2, y - capH);
-        c.lineTo(x2, y + capH);
-        c.stroke();
-
         c.restore();
       };
 
-      runUpPeriods.forEach(p    => drawSpan(p.si, p.ei, p.ev, getProfitColor(), getProfitBg(0.18)));
-      drawdownPeriods.forEach(p => drawSpan(p.si, p.ei, p.ev, getLossColor(),   getLossBg(0.18)));
+      runUpPeriods.forEach(p    => drawSpan(p.si, p.ei, getProfitColor()));
+      drawdownPeriods.forEach(p => drawSpan(p.si, p.ei, getLossColor()));
     }
   };
   // ────────────────────────────────────────────────────────────────────────────
