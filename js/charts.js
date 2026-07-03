@@ -482,17 +482,18 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           borderColor: mainColor,
           borderWidth: 2,
           segment: {
-          borderColor: ctx => {
-            if (ctx.p0DataIndex === undefined || ctx.p1DataIndex === undefined) return mainColor;
-            const p0 = lineData[ctx.p0DataIndex];
-            const p1 = lineData[ctx.p1DataIndex];
-            return ((p0 + p1) / 2) >= 0 ? getProfitColor() : getLossColor();
-          }
+            borderColor: ctx => {
+              if (ctx.p0DataIndex === undefined) return mainColor;
+              return stepColors[ctx.p0DataIndex] || mainColor;
+            }
           },
           backgroundColor: gradient,
           fill: true,
           tension: 0.15,
-          pointBackgroundColor: lineData.map(v => v >= 0 ? getProfitColor() : getLossColor()),
+          pointBackgroundColor: lineData.map((v, i) => {
+            if (i === 0) return getProfitColor();
+            return stepColors[i - 1] || getProfitColor();
+          }),
           pointBorderColor: "#09090b",
           pointBorderWidth: 1.5,
           pointRadius: lineData.length > 50 ? 0 : 4,
