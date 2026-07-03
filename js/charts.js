@@ -147,11 +147,22 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
   const sortedTrades = [...trades].filter(t => t.status !== "skipped").sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   let currentBalance = startingBalance;
+  let peak = startingBalance;
+  let valley = startingBalance;
+
   const labels = ["Start"];
   const data = [startingBalance];
+  const drawdowns = [0];
+  const runUps = [0];
 
   for (const trade of sortedTrades) {
     currentBalance += calcNetPnl(trade);
+    if (currentBalance > peak) peak = currentBalance;
+    if (currentBalance < valley) valley = currentBalance;
+
+    drawdowns.push(currentBalance - peak);
+    runUps.push(currentBalance - valley);
+
     const dateStr = new Date(trade.exitDateTime).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric"
@@ -225,10 +236,24 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
               const sign = diff >= 0 ? "+" : "";
               const formattedDiff = diff.toLocaleString("en-US", { minimumFractionDigits: 2 });
               const formattedPct = pct.toFixed(2);
-              return [
+              
+              const lines = [
                 `Balance: $${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
                 `Change: ${sign}$${formattedDiff} (${sign}${formattedPct}%)`
               ];
+
+              const dd = drawdowns[index];
+              const ru = runUps[index];
+              if (dd < -0.01) {
+                lines.push(`Drawdown from Peak: -$${Math.abs(dd).toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+              } else {
+                lines.push("At Peak Equity 🏆");
+              }
+              if (ru > 0.01) {
+                lines.push(`Run-up from Valley: +$${ru.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+              }
+
+              return lines;
             }
           }
         }
