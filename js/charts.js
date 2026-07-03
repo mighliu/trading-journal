@@ -3280,5 +3280,173 @@ export function renderAdherencePerformanceChart(trades) {
   });
 }
 
+export function renderDrawdownScatterChart(trades, startingBalance = 25000) {
+  const canvasId = "drawdownScatterChart";
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const sorted = [...trades]
+    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+
+  if (sorted.length === 0) return;
+
+  let current = startingBalance;
+  const lineData = [startingBalance];
+  sorted.forEach(t => {
+    current += calcNetPnl(t);
+    lineData.push(current);
+  });
+
+  const athIndices = [0];
+  let runningMax = lineData[0];
+  for (let i = 1; i < lineData.length; i++) {
+    if (lineData[i] > runningMax) {
+      athIndices.push(i);
+      runningMax = lineData[i];
+    }
+  }
+
+  const hasCurrentDd = athIndices[athIndices.length - 1] !== lineData.length - 1;
+  if (hasCurrentDd) {
+    athIndices.push(lineData.length - 1);
+  }
+
+  const getDateOfIdx = (idx) => {
+    if (idx === 0) {
+      return new Date(sorted[0].exitDateTime);
+    }
+    return new Date(sorted[idx - 1].exitDateTime);
+  };
+
+  const formatDate = (d) => {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const points = [];
+
+  for (let k = 0; k < athIndices.length - 1; k++) {
+    const idx1 = athIndices[k];
+    const idx2 = athIndices[k + 1];
+    
+    // Find absolute minimum in [idx1, idx2]
+    let troughIdx = idx1;
+    let minVal = lineData[idx1];
+    for (let j = idx1 + 1; j <= idx2; j++) {
+      if (lineData[j] < minVal) {
+        minVal = lineData[j];
+        troughIdx = j;
+      }
+    }
+
+    const isLastInterval = (k === athIndices.length - 2);
+    const isOngoing = isLastInterval && hasCurrentDd;
+
+    const standardTrades = idx2 - idx1;
+    const standardDays = (getDateOfIdx(idx2) - getDateOfIdx(idx1)) / (1000 * 60 * 60 * 24);
+    const maxDdAmt = lineData[idx1] - lineData[troughIdx];
+
+    if (maxDdAmt > 0 && standardTrades > 0) {
+      points.push({
+        x: standardDays,
+        y: maxDdAmt,
+        meta: {
+          dates: `${formatDate(getDateOfIdx(idx1))} – ${formatDate(getDateOfIdx(idx2))}${isOngoing ? ' (Ongoing)' : ''}`,
+          tradesCount: standardTrades,
+          ddPct: (maxDdAmt / startingBalance) * 100,
+          declineAmt: maxDdAmt
+        }
+      });
+    }
+  }
+
+  // Draw chart
+  const ctx = canvas.getContext("2d");
+  
+  // Clean previous instance if exists
+  if (chartInstances[canvasId]) {
+    chartInstances[canvasId].destroy();
+  }
+
+  const isLight = document.body.classList.contains("light-theme");
+  const pointBgColor = isLight ? "rgba(239, 68, 68, 0.65)" : "rgba(242, 54, 69, 0.7)";
+  const pointBorderColor = isLight ? "#ef4444" : "#f23645";
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [{
+        label: "Drawdown Cycles",
+        data: points,
+        backgroundColor: pointBgColor,
+        borderColor: pointBorderColor,
+        borderWidth: 1.5,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: pointBorderColor,
+        pointHoverBorderColor: "#fff",
+        pointHoverBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(18, 18, 18, 0.98)",
+          titleColor: isLight ? "#18181b" : "#f4f4f5",
+          bodyColor: isLight ? "#3f3f46" : "#e4e4e7",
+          borderColor: isLight ? "#e4e4e7" : "#27272a",
+          borderWidth: 1,
+          padding: 10,
+          displayColors: false,
+          callbacks: {
+            label: function(context) {
+              const pt = context.raw;
+              const formatVal = (n) => {
+                const absVal = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return `$${absVal}`;
+              };
+              return [
+                `Cycle: ${pt.meta.dates}`,
+                `Max Depth: -${formatVal(pt.y)} (-${pt.meta.ddPct.toFixed(2)}%)`,
+                `Recovery Time: ${pt.x.toFixed(1)} Days (${pt.meta.tradesCount} trades)`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Recovery Duration (Days)",
+            color: isLight ? "#71717a" : "#a1a1aa",
+            font: { family: "Inter, sans-serif", size: 10, weight: "bold" }
+          },
+          grid: { color: getGridColor() },
+          ticks: { color: getTickColor() },
+          min: 0
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Maximum Drawdown Depth ($)",
+            color: isLight ? "#71717a" : "#a1a1aa",
+            font: { family: "Inter, sans-serif", size: 10, weight: "bold" }
+          },
+          grid: { color: getGridColor() },
+          ticks: {
+            color: getTickColor(),
+            callback: value => `$${value.toLocaleString()}`
+          },
+          min: 0
+        }
+      }
+    }
+  });
+}
+
 
 

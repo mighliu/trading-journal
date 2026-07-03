@@ -24,7 +24,9 @@ import {
   calcDrawdownDurations,
   calcStreakProbability,
   calcMfe,
-  calcMae
+  calcMae,
+  calcAdvancedDrawdownMetrics,
+  calcDrawdownContributions
 } from './utils.js';
 
 let currentEditId = null;
@@ -2034,4 +2036,55 @@ export function renderRiskTab(trades) {
     const triggerEvent = new Event("input");
     calcBalance.dispatchEvent(triggerEvent);
   }
+
+  // ── Advanced Drawdown & Recovery Diagnostics ─────────────────────────────────
+  const adv = calcAdvancedDrawdownMetrics(trades, AppState.settings.startingBalance);
+  
+  const riskUlcerIndex = document.getElementById("riskUlcerIndex");
+  const riskPainIndex = document.getElementById("riskPainIndex");
+  const riskPainRatio = document.getElementById("riskPainRatio");
+  const riskAvgTtr = document.getElementById("riskAvgTtr");
+  const riskAvgDeclineSpeed = document.getElementById("riskAvgDeclineSpeed");
+  const riskAvgRecoverySpeed = document.getElementById("riskAvgRecoverySpeed");
+  const riskElevatorIndex = document.getElementById("riskElevatorIndex");
+
+  if (riskUlcerIndex) riskUlcerIndex.textContent = adv.ulcerIndex.toFixed(2);
+  if (riskPainIndex) riskPainIndex.textContent = adv.painIndex.toFixed(2);
+  if (riskPainRatio) {
+    riskPainRatio.textContent = adv.painRatio.toFixed(2);
+    riskPainRatio.className = adv.painRatio >= 1.0 ? "bold profit" : (adv.painRatio > 0 ? "bold" : "bold loss");
+  }
+  if (riskAvgTtr) riskAvgTtr.textContent = `${adv.avgTtrDays.toFixed(1)} Days (${adv.avgTtrTrades.toFixed(1)} trades)`;
+  if (riskAvgDeclineSpeed) riskAvgDeclineSpeed.textContent = formatCurrency(adv.avgDeclineSpeed) + " / day";
+  if (riskAvgRecoverySpeed) riskAvgRecoverySpeed.textContent = formatCurrency(adv.avgRecoverySpeed) + " / day";
+  if (riskElevatorIndex) {
+    riskElevatorIndex.textContent = adv.elevatorIndex.toFixed(2);
+    riskElevatorIndex.className = adv.elevatorIndex > 1.0 ? "bold loss" : "bold profit";
+  }
+
+  // ── Drawdown Decline Contribution Breakdown ──────────────────────────────
+  const contribs = calcDrawdownContributions(trades, AppState.settings.startingBalance);
+
+  const populateDeclineTable = (elementId, dataList) => {
+    const tbody = document.getElementById(elementId);
+    if (!tbody) return;
+    
+    if (!dataList || dataList.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" align="center" class="muted" style="padding: 12px 0;">No drawdown data</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = dataList.map(item => `
+      <tr>
+        <td align="left" class="bold" style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.02);">${escapeHtml(item.name)}</td>
+        <td align="right" class="loss" style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.02);">${formatCurrency(item.pnl)}</td>
+        <td align="right" style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.02);">${item.count}</td>
+        <td align="right" class="bold" style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.02);">${item.contribution.toFixed(1)}%</td>
+      </tr>
+    `).join("");
+  };
+
+  populateDeclineTable("riskDeclineSetupBody", contribs.setup);
+  populateDeclineTable("riskDeclineMistakeBody", contribs.mistake);
+  populateDeclineTable("riskDeclineSymbolBody", contribs.symbol);
 }

@@ -961,3 +961,250 @@ export function calcStreakProbability(trades) {
     actualLoss: streaks.worstLossStreak
   };
 }
+
+export function calcAdvancedDrawdownMetrics(trades, startingBalance = 25000) {
+  const sorted = [...trades]
+    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+    
+  if (sorted.length === 0) {
+    return {
+      ulcerIndex: 0,
+      painIndex: 0,
+      painRatio: 0,
+      avgTtrDays: 0,
+      avgTtrTrades: 0,
+      avgDeclineSpeed: 0,
+      avgRecoverySpeed: 0,
+      elevatorIndex: 0
+    };
+  }
+
+  let current = startingBalance;
+  const lineData = [startingBalance];
+  sorted.forEach(t => {
+    current += calcNetPnl(t);
+    lineData.push(current);
+  });
+
+  const athIndices = [0];
+  let runningMax = lineData[0];
+  
+  let sumSqDrawdown = 0;
+  let sumDrawdown = 0;
+  const N = lineData.length;
+
+  for (let i = 0; i < N; i++) {
+    const val = lineData[i];
+    if (val > runningMax) {
+      runningMax = val;
+    }
+    const ddVal = runningMax - val;
+    const ddPct = (ddVal / startingBalance) * 100;
+    sumSqDrawdown += ddPct * ddPct;
+    sumDrawdown += ddPct;
+  }
+
+  const ulcerIndex = Math.sqrt(sumSqDrawdown / N);
+  const painIndex = sumDrawdown / N;
+
+  const totalPnl = current - startingBalance;
+  const totalPnlPct = (totalPnl / startingBalance) * 100;
+  const painRatio = painIndex > 0 ? (totalPnlPct / painIndex) : (totalPnlPct > 0 ? 99.9 : 0);
+
+  // ATH intervals
+  let peakMax = lineData[0];
+  for (let i = 1; i < lineData.length; i++) {
+    if (lineData[i] > peakMax) {
+      athIndices.push(i);
+      peakMax = lineData[i];
+    }
+  }
+  if (athIndices[athIndices.length - 1] !== lineData.length - 1) {
+    athIndices.push(lineData.length - 1);
+  }
+
+  const getDateOfIdx = (idx) => {
+    if (idx === 0) {
+      return new Date(sorted[0].exitDateTime);
+    }
+    return new Date(sorted[idx - 1].exitDateTime);
+  };
+
+  const completedTtrDays = [];
+  const completedTtrTrades = [];
+  const declineSpeeds = [];
+  const recoverySpeeds = [];
+
+  for (let k = 0; k < athIndices.length - 1; k++) {
+    const idx1 = athIndices[k];
+    const idx2 = athIndices[k + 1];
+    
+    let troughIdx = idx1;
+    let minVal = lineData[idx1];
+    for (let j = idx1 + 1; j <= idx2; j++) {
+      if (lineData[j] < minVal) {
+        minVal = lineData[j];
+        troughIdx = j;
+      }
+    }
+
+    const hasCurrentDd = athIndices[athIndices.length - 1] !== lineData.length - 1;
+    const isLastInterval = (k === athIndices.length - 2);
+    const isOngoing = isLastInterval && hasCurrentDd;
+
+    const standardTrades = idx2 - idx1;
+    const standardDays = (getDateOfIdx(idx2) - getDateOfIdx(idx1)) / (1000 * 60 * 60 * 24);
+
+    if (!isOngoing && standardTrades > 0) {
+      completedTtrDays.push(standardDays);
+      completedTtrTrades.push(standardTrades);
+    }
+
+    const declineTrades = troughIdx - idx1;
+    const declineDays = (getDateOfIdx(troughIdx) - getDateOfIdx(idx1)) / (1000 * 60 * 60 * 24);
+    const declineChange = lineData[troughIdx] - lineData[idx1];
+
+    if (declineTrades > 0 && declineChange < 0) {
+      const speed = Math.abs(declineChange) / Math.max(0.1, declineDays);
+      declineSpeeds.push(speed);
+    }
+
+    const recoveryTrades = idx2 - troughIdx;
+    const recoveryDays = (getDateOfIdx(idx2) - getDateOfIdx(troughIdx)) / (1000 * 60 * 60 * 24);
+    const recoveryChange = lineData[idx2] - lineData[troughIdx];
+
+    if (recoveryTrades > 0 && recoveryChange > 0) {
+      const speed = recoveryChange / Math.max(0.1, recoveryDays);
+      recoverySpeeds.push(speed);
+    }
+  }
+
+  const avgTtrDays = completedTtrDays.length > 0 
+    ? completedTtrDays.reduce((sum, v) => sum + v, 0) / completedTtrDays.length 
+    : 0;
+  const avgTtrTrades = completedTtrTrades.length > 0 
+    ? completedTtrTrades.reduce((sum, v) => sum + v, 0) / completedTtrTrades.length 
+    : 0;
+
+  const avgDeclineSpeed = declineSpeeds.length > 0 
+    ? declineSpeeds.reduce((sum, v) => sum + v, 0) / declineSpeeds.length 
+    : 0;
+  const avgRecoverySpeed = recoverySpeeds.length > 0 
+    ? recoverySpeeds.reduce((sum, v) => sum + v, 0) / recoverySpeeds.length 
+    : 0;
+
+  const elevatorIndex = avgRecoverySpeed > 0 ? avgDeclineSpeed / avgRecoverySpeed : 0;
+
+  return {
+    ulcerIndex: parseFloat(ulcerIndex.toFixed(2)),
+    painIndex: parseFloat(painIndex.toFixed(2)),
+    painRatio: parseFloat(painRatio.toFixed(2)),
+    avgTtrDays: parseFloat(avgTtrDays.toFixed(1)),
+    avgTtrTrades: parseFloat(avgTtrTrades.toFixed(1)),
+    avgDeclineSpeed: parseFloat(avgDeclineSpeed.toFixed(2)),
+    avgRecoverySpeed: parseFloat(avgRecoverySpeed.toFixed(2)),
+    elevatorIndex: parseFloat(elevatorIndex.toFixed(2))
+  };
+}
+
+export function calcDrawdownContributions(trades, startingBalance = 25000) {
+  const sorted = [...trades]
+    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+
+  if (sorted.length === 0) {
+    return { setup: [], mistake: [], symbol: [], totalDeclineLoss: 0 };
+  }
+
+  let current = startingBalance;
+  const lineData = [startingBalance];
+  sorted.forEach(t => {
+    current += calcNetPnl(t);
+    lineData.push(current);
+  });
+
+  const athIndices = [0];
+  let runningMax = lineData[0];
+  for (let i = 1; i < lineData.length; i++) {
+    if (lineData[i] > runningMax) {
+      athIndices.push(i);
+      runningMax = lineData[i];
+    }
+  }
+  if (athIndices[athIndices.length - 1] !== lineData.length - 1) {
+    athIndices.push(lineData.length - 1);
+  }
+
+  const declineTradeIds = new Set();
+  
+  for (let k = 0; k < athIndices.length - 1; k++) {
+    const idx1 = athIndices[k];
+    const idx2 = athIndices[k + 1];
+    
+    let troughIdx = idx1;
+    let minVal = lineData[idx1];
+    for (let j = idx1 + 1; j <= idx2; j++) {
+      if (lineData[j] < minVal) {
+        minVal = lineData[j];
+        troughIdx = j;
+      }
+    }
+    
+    for (let j = idx1 + 1; j <= troughIdx; j++) {
+      const trade = sorted[j - 1];
+      if (trade) {
+        declineTradeIds.add(trade.id);
+      }
+    }
+  }
+
+  const declineTrades = sorted.filter(t => declineTradeIds.has(t.id));
+
+  const setupGroups = {};
+  const mistakeGroups = {};
+  const symbolGroups = {};
+
+  declineTrades.forEach(t => {
+    const pnl = calcNetPnl(t);
+    
+    const setup = t.setup || "Unspecified";
+    if (!setupGroups[setup]) setupGroups[setup] = { pnl: 0, count: 0 };
+    setupGroups[setup].pnl += pnl;
+    setupGroups[setup].count += 1;
+
+    const mistake = t.mistake || "None";
+    if (!mistakeGroups[mistake]) mistakeGroups[mistake] = { pnl: 0, count: 0 };
+    mistakeGroups[mistake].pnl += pnl;
+    mistakeGroups[mistake].count += 1;
+
+    const symbol = t.symbol || "Unknown";
+    if (!symbolGroups[symbol]) symbolGroups[symbol] = { pnl: 0, count: 0 };
+    symbolGroups[symbol].pnl += pnl;
+    symbolGroups[symbol].count += 1;
+  });
+
+  const getSortedContributions = (groups) => {
+    const negativeGroups = Object.entries(groups)
+      .map(([name, data]) => ({ name, pnl: data.pnl, count: data.count }))
+      .filter(g => g.pnl < 0);
+
+    const totalNegPnl = negativeGroups.reduce((sum, g) => sum + g.pnl, 0);
+
+    return negativeGroups
+      .map(g => ({
+        name: g.name,
+        pnl: g.pnl,
+        count: g.count,
+        contribution: totalNegPnl < 0 ? (g.pnl / totalNegPnl) * 100 : 0
+      }))
+      .sort((a, b) => a.pnl - b.pnl);
+  };
+
+  return {
+    setup: getSortedContributions(setupGroups),
+    mistake: getSortedContributions(mistakeGroups),
+    symbol: getSortedContributions(symbolGroups),
+    totalDeclineLoss: declineTrades.reduce((sum, t) => sum + calcNetPnl(t), 0)
+  };
+}

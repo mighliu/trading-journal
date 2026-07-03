@@ -40,7 +40,8 @@ import {
   renderTradeSequenceChart,
   renderPostLossBehaviorChart,
   renderTimelineReplayChart,
-  renderAdherencePerformanceChart
+  renderAdherencePerformanceChart,
+  renderDrawdownScatterChart
 } from './charts.js';
 import { hasSevereDeviation } from './utils.js';
 
@@ -214,6 +215,7 @@ function renderActiveView(filteredTrades) {
     renderPostLossBehaviorChart(tradesForRisk);
     renderTimelineReplayChart(tradesForRisk);
     renderAdherencePerformanceChart(tradesForRisk);
+    renderDrawdownScatterChart(tradesForRisk, AppState.settings.startingBalance);
   }
 }
 

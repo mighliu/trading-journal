@@ -818,6 +818,128 @@
           </div>
         </div>
 
+        <!-- Drawdown & Recovery Diagnostics Card -->
+        <div class="chart-card" style="margin-bottom: 24px;">
+          <div class="chart-header">
+            <h3 class="chart-title">
+              <i data-lucide="shield-alert" style="color: #ef4444"></i> Drawdown & Recovery Diagnostics
+              <span class="tooltip-trigger" data-tooltip="Advanced risk analysis: Ulcer Index measures overall drawdown distress, Pain Ratio measures return relative to drawdown depth, Elevator Index compares average decline speed versus average recovery speed, and Average Time to Recovery shows the average duration of completed cycles.">
+                <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+              </span>
+            </h3>
+          </div>
+          <div class="card-body" style="padding: 16px; display: grid; grid-template-columns: 1fr 2fr; gap: 20px; min-height: 300px; flex-wrap: wrap;">
+            <!-- Left Panel: Advanced Metrics -->
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.875rem; justify-content: center;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">Ulcer Index:</span>
+                <span id="riskUlcerIndex" class="bold" style="color: var(--text-primary);">0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">Pain Index:</span>
+                <span id="riskPainIndex" class="bold" style="color: var(--text-primary);">0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">Pain Ratio:</span>
+                <span id="riskPainRatio" class="bold" style="color: var(--text-primary);">0.00</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">Avg Time to Recovery:</span>
+                <span id="riskAvgTtr" class="bold" style="color: var(--text-primary);">0.0 Days (0.0 trades)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">Avg Decline Speed:</span>
+                <span id="riskAvgDeclineSpeed" class="bold" style="color: var(--loss);">$0.00 / day</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span class="muted">Avg Recovery Speed:</span>
+                <span id="riskAvgRecoverySpeed" class="bold" style="color: var(--profit);">$0.00 / day</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span class="muted">Elevator Index:</span>
+                <span id="riskElevatorIndex" class="bold" style="color: var(--text-primary);">0.00</span>
+              </div>
+            </div>
+            <!-- Right Panel: Scatter Chart -->
+            <div class="chart-container-medium" style="height: 280px; position: relative;">
+              <canvas id="drawdownScatterChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Drawdown Decline Contribution Card -->
+        <div class="chart-card" style="margin-bottom: 24px;">
+          <div class="chart-header">
+            <h3 class="chart-title">
+              <i data-lucide="pie-chart" style="color: var(--accent)"></i> Drawdown Decline Contribution Analysis
+              <span class="tooltip-trigger" data-tooltip="Tabulates losses incurred during active drawdown decline phases (the red segments on the timeline). Identifies which setups, mistakes, or symbols are the primary drivers of your drawdowns.">
+                <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+              </span>
+            </h3>
+          </div>
+          <div class="card-body" style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+            <!-- Setup Tags Breakdown -->
+            <div>
+              <h4 style="font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">By Setup Tag</h4>
+              <div style="max-height: 180px; overflow-y: auto;">
+                <table class="table" style="font-size: 0.75rem; width: 100%;">
+                  <thead>
+                    <tr>
+                      <th align="left" style="color: var(--text-secondary);">Setup</th>
+                      <th align="right" style="color: var(--text-secondary);">Net Loss</th>
+                      <th align="right" style="color: var(--text-secondary);">Trades</th>
+                      <th align="right" style="color: var(--text-secondary);">Contrib</th>
+                    </tr>
+                  </thead>
+                  <tbody id="riskDeclineSetupBody">
+                    <tr><td colspan="4" align="center" class="muted">No drawdown data</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Mistakes Breakdown -->
+            <div>
+              <h4 style="font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">By Behavioral Mistake</h4>
+              <div style="max-height: 180px; overflow-y: auto;">
+                <table class="table" style="font-size: 0.75rem; width: 100%;">
+                  <thead>
+                    <tr>
+                      <th align="left" style="color: var(--text-secondary);">Mistake</th>
+                      <th align="right" style="color: var(--text-secondary);">Net Loss</th>
+                      <th align="right" style="color: var(--text-secondary);">Trades</th>
+                      <th align="right" style="color: var(--text-secondary);">Contrib</th>
+                    </tr>
+                  </thead>
+                  <tbody id="riskDeclineMistakeBody">
+                    <tr><td colspan="4" align="center" class="muted">No drawdown data</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Symbols Breakdown -->
+            <div>
+              <h4 style="font-size: 0.8rem; text-transform: uppercase; margin-bottom: 8px; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">By Ticker Symbol</h4>
+              <div style="max-height: 180px; overflow-y: auto;">
+                <table class="table" style="font-size: 0.75rem; width: 100%;">
+                  <thead>
+                    <tr>
+                      <th align="left" style="color: var(--text-secondary);">Symbol</th>
+                      <th align="right" style="color: var(--text-secondary);">Net Loss</th>
+                      <th align="right" style="color: var(--text-secondary);">Trades</th>
+                      <th align="right" style="color: var(--text-secondary);">Contrib</th>
+                    </tr>
+                  </thead>
+                  <tbody id="riskDeclineSymbolBody">
+                    <tr><td colspan="4" align="center" class="muted">No drawdown data</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Revenge Trading & Sequence Performance Group -->
         <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 24px;">
           <div class="chart-card">
