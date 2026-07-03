@@ -179,7 +179,13 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
   // ── Compute macro swing phases using a ZigZag algorithm ────────────────────
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
-  const threshold = (parseFloat(startingBalance) || 25000) * 0.008;
+
+  // Auto-calibrate threshold to the actual data range so we get macro swings
+  const dataMin = Math.min(...lineData);
+  const dataMax = Math.max(...lineData);
+  const dataRange = dataMax - dataMin;
+  // Use 12% of the total range — gives roughly 5–10 swings regardless of scale
+  const threshold = dataRange > 0 ? dataRange * 0.12 : (parseFloat(startingBalance) || 25000) * 0.03;
 
   let lastExtremeVal = lineData[0];
   let lastExtremeIdx = 0;
