@@ -162,8 +162,9 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     data.push(currentBalance);
   }
 
+  const startBal = parseFloat(startingBalance) || 25000;
   const ctx = canvas.getContext("2d");
-  const isProfitable = currentBalance >= startingBalance;
+  const isProfitable = currentBalance >= startBal;
   const mainColor = isProfitable ? getProfitColor() : getLossColor();
   
   // Create gradient
@@ -180,10 +181,18 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         data: data,
         borderColor: mainColor,
         borderWidth: 2,
+        segment: {
+          borderColor: ctx => {
+            if (!ctx.p0 || !ctx.p1) return mainColor;
+            const p0 = ctx.p0.parsed.y;
+            const p1 = ctx.p1.parsed.y;
+            return ((p0 + p1) / 2) >= startBal ? getProfitColor() : getLossColor();
+          }
+        },
         backgroundColor: gradient,
         fill: true,
         tension: 0.2,
-        pointBackgroundColor: mainColor,
+        pointBackgroundColor: data.map(v => v >= startBal ? getProfitColor() : getLossColor()),
         pointBorderColor: "#09090b",
         pointBorderWidth: 1.5,
         pointRadius: data.length > 50 ? 0 : 4,
