@@ -334,13 +334,16 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
               const dd = drawdowns[index];
               const ru = runUps[index];
-              if (dd < -0.01) {
+              
+              const inRunUp = runUpPeriods.some(p => index >= p.si && index <= p.ei);
+              const inDrawdown = drawdownPeriods.some(p => index >= p.si && index <= p.ei);
+
+              if (inDrawdown && dd < -0.01) {
                 lines.push(`Drawdown from Peak: -$${Math.abs(dd).toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
-              } else {
-                lines.push("At Peak Equity 🏆");
-              }
-              if (ru > 0.01) {
+              } else if (inRunUp && ru > 0.01) {
                 lines.push(`Run-up from Valley: +$${ru.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+              } else if (dd >= -0.01) {
+                lines.push("At Peak Equity 🏆");
               }
 
               return lines;
