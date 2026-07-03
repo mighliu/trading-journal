@@ -177,26 +177,52 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
-  // ── Color each step using the running-maximum (all-time-high) approach ───────
-  // GREEN  = equity is at or above its all-time high → run-up / new high territory
-  // RED    = equity is below its all-time high       → drawdown territory
-  //
-  // This matches TradingView exactly: during a sustained uptrend every winning
-  // trade pushes equity to a new high → long green segment; a significant decline
-  // keeps equity below the peak → long red segment; isolated losses in an
-  // uptrend create only a brief red blip before the next winner makes a new high.
+  // ── Color each step using Peak-to-Trough (drawdown) / Trough-to-Peak (run-up) ─────────────────
+  // This matches TradingView's visual definition of drawdown and run-up periods:
+  // A drawdown period begins at a peak (all-time high) and ends at the lowest point (trough)
+  // before the equity curve recovers to a new all-time high.
+  // A run-up period begins at that trough and ends when the equity curve reaches the next all-time high.
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
-  let runningMax = lineData[0]; // 0 at start (cumulative P&L baseline)
-
+  
+  // 1. Identify all All-Time High (ATH) indices
+  const athIndices = [0];
+  let runningMax = lineData[0];
   for (let i = 1; i < lineData.length; i++) {
-    if (lineData[i] >= runningMax) {
-      stepColors[i - 1] = getProfitColor(); // at or above all-time high
-      runningMax = lineData[i];             // update the peak
-    } else {
-      stepColors[i - 1] = getLossColor();   // in drawdown below peak
+    if (lineData[i] > runningMax) {
+      athIndices.push(i);
+      runningMax = lineData[i];
     }
   }
-  // ────────────────────────────────────────────────────────────────────────────
+  // Ensure the end of the line data is included as a boundary
+  if (athIndices[athIndices.length - 1] !== lineData.length - 1) {
+    athIndices.push(lineData.length - 1);
+  }
+
+  // 2. Loop through consecutive ATH intervals and find the trough (minimum value)
+  for (let k = 0; k < athIndices.length - 1; k++) {
+    const idx1 = athIndices[k];
+    const idx2 = athIndices[k + 1];
+    
+    // Find the index of the absolute minimum value in the range [idx1, idx2]
+    let troughIdx = idx1;
+    let minVal = lineData[idx1];
+    for (let j = idx1 + 1; j <= idx2; j++) {
+      if (lineData[j] < minVal) {
+        minVal = lineData[j];
+        troughIdx = j;
+      }
+    }
+    
+    // Peak-to-Trough is a drawdown (Loss Color)
+    for (let j = idx1; j < troughIdx; j++) {
+      stepColors[j] = getLossColor();
+    }
+    // Trough-to-Peak/New High is a run-up (Profit Color)
+    for (let j = troughIdx; j < idx2; j++) {
+      stepColors[j] = getProfitColor();
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────────────────────────
 
   const ctx = canvas.getContext("2d");
   const isProfitable = runningPnl >= 0;
