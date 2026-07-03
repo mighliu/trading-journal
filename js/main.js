@@ -192,6 +192,7 @@ function renderActiveView(filteredTrades) {
     renderAnalyticsTab(filteredTrades);
     renderHoldTimeScatterChart(filteredTrades);
     renderFatiguePivotChart(filteredTrades);
+    renderTradeSequenceChart(filteredTrades);
 
   } else if (currentTab === "intervention") {
     const backupStatus = AppState.activeFilters.status;
