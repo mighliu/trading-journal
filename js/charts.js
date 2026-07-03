@@ -177,6 +177,28 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
+  // ── Compute swing periods ──────────────────────────────────────────────────
+  const swings = [{ index: 0, value: lineData[0] }];
+  for (let i = 1; i < lineData.length - 1; i++) {
+    const prev = lineData[i - 1];
+    const curr = lineData[i];
+    const next = lineData[i + 1];
+    if (curr > prev && curr >= next) swings.push({ index: i, value: curr, type: "peak" });
+    else if (curr < prev && curr <= next) swings.push({ index: i, value: curr, type: "trough" });
+  }
+  if (lineData.length > 1) swings.push({ index: lineData.length - 1, value: lineData[lineData.length - 1] });
+
+  const runUpPeriods    = [];
+  const drawdownPeriods = [];
+  for (let i = 0; i < swings.length - 1; i++) {
+    const from  = swings[i];
+    const to    = swings[i + 1];
+    const delta = to.value - from.value;
+    if (delta > 0.01)  runUpPeriods.push({ si: from.index, ei: to.index, sv: from.value, ev: to.value, delta });
+    if (delta < -0.01) drawdownPeriods.push({ si: from.index, ei: to.index, sv: from.value, ev: to.value, delta });
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const ctx = canvas.getContext("2d");
   const isProfitable = runningPnl >= 0;
   const mainColor = isProfitable ? getProfitColor() : getLossColor();
@@ -196,8 +218,66 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     return v >= 0 ? getProfitColor() : getLossColor();
   });
 
+  // ── Custom plugin: draw swing span lines ───────────────────────────────────
+  const swingLinesPlugin = {
+    id: "swingLines",
+    afterDraw(chart) {
+      const c      = chart.ctx;
+      const yScale = chart.scales.y;
+      const meta0  = chart.getDatasetMeta(0);
+      if (!meta0 || !meta0.data || meta0.data.length < 2) return;
+
+      const getX = (idx) => {
+        const pt = meta0.data[idx];
+        return pt ? pt.x : null;
+      };
+
+      const drawSpan = (si, ei, yValue, lineColor, fillColor) => {
+        const x1 = getX(si);
+        const x2 = getX(ei);
+        if (x1 === null || x2 === null || x1 === x2) return;
+        const y    = yScale.getPixelForValue(yValue);
+        const capH = 5;
+
+        c.save();
+
+        // Translucent fill behind line
+        c.fillStyle = fillColor;
+        c.fillRect(x1, y - capH, x2 - x1, capH * 2);
+
+        // Horizontal line
+        c.beginPath();
+        c.strokeStyle = lineColor;
+        c.lineWidth = 2;
+        c.setLineDash([]);
+        c.moveTo(x1, y);
+        c.lineTo(x2, y);
+        c.stroke();
+
+        // Left end-cap
+        c.beginPath();
+        c.moveTo(x1, y - capH);
+        c.lineTo(x1, y + capH);
+        c.stroke();
+
+        // Right end-cap
+        c.beginPath();
+        c.moveTo(x2, y - capH);
+        c.lineTo(x2, y + capH);
+        c.stroke();
+
+        c.restore();
+      };
+
+      runUpPeriods.forEach(p    => drawSpan(p.si, p.ei, p.ev, getProfitColor(), getProfitBg(0.18)));
+      drawdownPeriods.forEach(p => drawSpan(p.si, p.ei, p.ev, getLossColor(),   getLossBg(0.18)));
+    }
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   chartInstances[canvasId] = new Chart(ctx, {
     type: "bar",
+    plugins: [swingLinesPlugin],
     data: {
       labels: labels,
       datasets: [
