@@ -374,24 +374,26 @@ export function renderTradeLog(trades, page = 1) {
     });
 
     let slippageIcon = "";
-    const hasSigEntry = t.signalEntryPrice !== null && t.signalEntryPrice !== undefined && t.signalEntryPrice !== "";
-    const hasSigExit = t.signalExitPrice !== null && t.signalExitPrice !== undefined && t.signalExitPrice !== "";
-    if (hasSigEntry || hasSigExit) {
-      const sigEntry = hasSigEntry ? parseFloat(t.signalEntryPrice) : t.entryPrice;
-      const sigExit = hasSigExit ? parseFloat(t.signalExitPrice) : t.exitPrice;
-      const actEntry = t.entryPrice;
-      const actExit = t.exitPrice;
+    if (t.status !== "skipped") {
+      const hasSigEntry = t.signalEntryPrice !== null && t.signalEntryPrice !== undefined && t.signalEntryPrice !== "";
+      const hasSigExit = t.signalExitPrice !== null && t.signalExitPrice !== undefined && t.signalExitPrice !== "";
+      if (hasSigEntry || hasSigExit) {
+        const sigEntry = hasSigEntry ? parseFloat(t.signalEntryPrice) : t.entryPrice;
+        const sigExit = hasSigExit ? parseFloat(t.signalExitPrice) : t.exitPrice;
+        const actEntry = t.entryPrice;
+        const actExit = t.exitPrice;
 
-      let entrySlippage = t.direction === "long" ? sigEntry - actEntry : actEntry - sigEntry;
-      let exitSlippage = t.direction === "long" ? actExit - sigExit : sigExit - actExit;
+        let entrySlippage = t.direction === "long" ? sigEntry - actEntry : actEntry - sigEntry;
+        let exitSlippage = t.direction === "long" ? actExit - sigExit : sigExit - actExit;
 
-      if ((hasSigEntry && entrySlippage < -0.01) || (hasSigExit && exitSlippage < -0.01)) {
-        const actPnl = calcNetPnl(t);
-        const sigPnl = calcSignalPnl(t);
-        const totalSlippageDollar = actPnl - sigPnl;
-        
-        if (totalSlippageDollar < -0.01) {
-          slippageIcon = ` <span class="slippage-warn-icon tooltip-trigger" data-tooltip="Negative slippage detected: ${formatCurrency(totalSlippageDollar)} (Worse execution than signal)"><i data-lucide="alert-triangle" style="width: 13px; height: 13px; color: #fbbf24; margin-left: 4px; vertical-align: middle;"></i></span>`;
+        if ((hasSigEntry && entrySlippage < -0.01) || (hasSigExit && exitSlippage < -0.01)) {
+          const actPnl = calcNetPnl(t);
+          const sigPnl = calcSignalPnl(t);
+          const totalSlippageDollar = actPnl - sigPnl;
+          
+          if (totalSlippageDollar < -0.01) {
+            slippageIcon = ` <span class="slippage-warn-icon tooltip-trigger" data-tooltip="Negative slippage detected: ${formatCurrency(totalSlippageDollar)} (Worse execution than signal)"><i data-lucide="alert-triangle" style="width: 13px; height: 13px; color: #fbbf24; margin-left: 4px; vertical-align: middle;"></i></span>`;
+          }
         }
       }
     }
