@@ -10,7 +10,8 @@ import {
   calcRiskReward,
   calcDailySequence,
   calcPostLossPerformance,
-  calcProfitFactor
+  calcProfitFactor,
+  formatCurrency
 } from './utils.js';
 import { AppState } from './state.js';
 
