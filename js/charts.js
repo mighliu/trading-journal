@@ -254,6 +254,10 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           // Disable standard tooltip when hovering the bottom timeline bar
           if (chart.options.plugins.tooltip.enabled !== false) {
             chart.options.plugins.tooltip.enabled = false;
+            if (chart.tooltip) {
+              chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            }
+            chart.update("none");
           }
           
           const meta = chart.getDatasetMeta(0);
@@ -270,17 +274,18 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           }
           if (found !== this.hoveredSegment) {
             this.hoveredSegment = found;
-            chart.draw();
+            chart.update("none");
           }
         } else {
           // Enable standard tooltip when hovering the main chart area
           if (chart.options.plugins.tooltip.enabled !== true) {
             chart.options.plugins.tooltip.enabled = true;
+            chart.update("none");
           }
           
           if (this.hoveredSegment !== null) {
             this.hoveredSegment = null;
-            chart.draw();
+            chart.update("none");
           }
         }
       };
@@ -289,7 +294,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         chart.options.plugins.tooltip.enabled = true;
         if (this.hoveredSegment !== null) {
           this.hoveredSegment = null;
-          chart.draw();
+          chart.update("none");
         }
       };
 
