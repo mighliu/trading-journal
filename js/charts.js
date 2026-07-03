@@ -11,7 +11,8 @@ import {
   calcDailySequence,
   calcPostLossPerformance,
   calcProfitFactor,
-  formatCurrency
+  formatCurrency,
+  calcFatiguePivotData
 } from './utils.js';
 import { AppState } from './state.js';
 
