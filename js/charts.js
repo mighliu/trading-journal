@@ -180,39 +180,22 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
   // ── Compute macro swing phases (Drawdown vs Run-up recovery) ───────────────
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
 
-  const peakIndices = [0];
-  let runningMax = lineData[0];
+  let peakVal = lineData[0];
+  let peakIdx = 0;
+
   for (let i = 1; i < lineData.length; i++) {
-    if (lineData[i] > runningMax) {
-      runningMax = lineData[i];
-      peakIndices.push(i);
-    }
-  }
-
-  const processInterval = (start, end) => {
-    if (start >= end) return;
-    let minIdx = start;
-    let minVal = lineData[start];
-    for (let j = start + 1; j <= end; j++) {
-      if (lineData[j] < minVal) {
-        minVal = lineData[j];
-        minIdx = j;
+    const val = lineData[i];
+    if (val < peakVal) {
+      // Mark all steps from the peak to this drop as Red (Drawdown)
+      for (let j = peakIdx; j < i; j++) {
+        stepColors[j] = getLossColor();
       }
+    } else {
+      // Recovered or new peak!
+      peakVal = val;
+      peakIdx = i;
     }
-    // Decline phase: Red (Drawdown)
-    for (let j = start; j < minIdx; j++) {
-      stepColors[j] = getLossColor();
-    }
-    // Recovery phase: Green (Run-up)
-    for (let j = minIdx; j < end; j++) {
-      stepColors[j] = getProfitColor();
-    }
-  };
-
-  for (let k = 0; k < peakIndices.length - 1; k++) {
-    processInterval(peakIndices[k], peakIndices[k + 1]);
   }
-  processInterval(peakIndices[peakIndices.length - 1], lineData.length - 1);
   // ────────────────────────────────────────────────────────────────────────────
 
   const ctx = canvas.getContext("2d");
@@ -418,7 +401,16 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           // Change value (right-aligned)
           const startVal = lineData[startIdx];
           const endVal = lineData[endIdx];
-          const change = endVal - startVal;
+          let change = endVal - startVal;
+          if (isLoss) {
+            let minVal = startVal;
+            for (let j = startIdx; j <= endIdx; j++) {
+              if (lineData[j] < minVal) {
+                minVal = lineData[j];
+              }
+            }
+            change = minVal - startVal;
+          }
           const changeText = (change >= 0 ? "+" : "") + formatCurrency(change);
 
           c.textAlign = "right";
