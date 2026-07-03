@@ -177,15 +177,23 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
-  // ── Color each step by individual trade outcome (win = green, loss = red) ──
-  // This matches TradingView's run-up/drawdown definition: consecutive winning
-  // trades form a green segment; consecutive losing trades form a red segment.
+  // ── Color each step by the NET P&L of that trade's exit DAY ─────────────────
+  // All trades on a day with net profit → green (run-up).
+  // All trades on a day with net loss   → red  (drawdown).
+  // This groups intraday trades into a single color block per day, matching
+  // TradingView's run-up / drawdown visualization on the bottom timeline bar.
+  const dayNetPnl = {};
+  for (const trade of sortedTrades) {
+    const dateKey = new Date(trade.exitDateTime).toISOString().slice(0, 10);
+    dayNetPnl[dateKey] = (dayNetPnl[dateKey] || 0) + calcNetPnl(trade);
+  }
+
   const stepColors = new Array(lineData.length - 1).fill(getProfitColor());
   for (let i = 1; i < lineData.length; i++) {
-    const tradePnl = barData[i]; // null for the Start point
-    if (tradePnl !== null) {
-      stepColors[i - 1] = tradePnl >= 0 ? getProfitColor() : getLossColor();
-    }
+    const trade = sortedTrades[i - 1];
+    const dateKey = new Date(trade.exitDateTime).toISOString().slice(0, 10);
+    const dayPnl = dayNetPnl[dateKey] ?? 0;
+    stepColors[i - 1] = dayPnl >= 0 ? getProfitColor() : getLossColor();
   }
   // ────────────────────────────────────────────────────────────────────────────
 
