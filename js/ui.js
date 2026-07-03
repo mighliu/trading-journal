@@ -26,7 +26,10 @@ import {
   calcMfe,
   calcMae,
   calcAdvancedDrawdownMetrics,
-  calcDrawdownContributions
+  calcDrawdownContributions,
+  calcHoldTimeDiagnostics,
+  calcFatiguePivotData,
+  calcSetupMistakeMatrix
 } from './utils.js';
 
 let currentEditId = null;
@@ -2087,4 +2090,114 @@ export function renderRiskTab(trades) {
   populateDeclineTable("riskDeclineSetupBody", contribs.setup);
   populateDeclineTable("riskDeclineMistakeBody", contribs.mistake);
   populateDeclineTable("riskDeclineSymbolBody", contribs.symbol);
+}
+
+export function renderAnalyticsTab(trades) {
+  // ── Holding Time Excursion Metrics ─────────────────────────────────────────
+  const ht = calcHoldTimeDiagnostics(trades);
+  const avgWinSpan = document.getElementById("analyticsAvgWinHold");
+  const avgLossSpan = document.getElementById("analyticsAvgLossHold");
+  const htRatioSpan = document.getElementById("analyticsHoldTimeRatio");
+  
+  const formatMins = (mins) => {
+    if (mins === 0) return "0.0m";
+    if (mins < 60) return `${mins.toFixed(1)}m`;
+    const hrs = Math.floor(mins / 60);
+    const remaining = Math.round(mins % 60);
+    return `${hrs}h ${remaining}m`;
+  };
+
+  if (avgWinSpan) avgWinSpan.textContent = formatMins(ht.avgWinMins);
+  if (avgLossSpan) avgLossSpan.textContent = formatMins(ht.avgLossMins);
+  if (htRatioSpan) {
+    htRatioSpan.textContent = ht.holdTimeRatio.toFixed(2);
+    if (ht.holdTimeRatio >= 1.0) {
+      htRatioSpan.className = "bold profit";
+      htRatioSpan.style.color = "";
+    } else {
+      htRatioSpan.className = "bold loss";
+      htRatioSpan.style.color = "";
+    }
+  }
+
+  // ── Daily Fatigue Pivot Badge ──────────────────────────────────────────────
+  const fatigue = calcFatiguePivotData(trades);
+  const fatigueBadge = document.getElementById("analyticsFatiguePivotBadge");
+  if (fatigueBadge) {
+    if (fatigue.pivot === null) {
+      fatigueBadge.textContent = "Pivot: None (No decay)";
+      fatigueBadge.style.background = "rgba(16, 185, 129, 0.15)";
+      fatigueBadge.style.color = "#10b981";
+      fatigueBadge.style.borderColor = "rgba(16, 185, 129, 0.3)";
+    } else {
+      fatigueBadge.textContent = `Pivot: After ${fatigue.pivot - 1} Trades`;
+      fatigueBadge.style.background = "rgba(239, 68, 68, 0.15)";
+      fatigueBadge.style.color = "#ef4444";
+      fatigueBadge.style.borderColor = "rgba(239, 68, 68, 0.3)";
+    }
+  }
+
+  // ── Setup vs. Mistake Heatmap Matrix ───────────────────────────────────────
+  const matrixData = calcSetupMistakeMatrix(trades);
+  const headerRow = document.getElementById("setupMistakeHeaderRow");
+  const tbody = document.getElementById("setupMistakeBody");
+
+  if (headerRow && tbody) {
+    if (matrixData.setups.length === 0) {
+      headerRow.innerHTML = `<th align="left" style="color: var(--text-secondary); padding: 8px 12px;">No setups available</th>`;
+      tbody.innerHTML = `<tr><td align="center" class="muted" style="padding: 16px 0;">No setup vs mistake data available</td></tr>`;
+    } else {
+      // Header
+      headerRow.innerHTML = `
+        <th align="left" style="color: var(--text-secondary); padding: 10px 12px; font-weight: 600; border-bottom: 1px solid var(--border);">Setup</th>
+        ${matrixData.mistakes.map(m => `
+          <th align="right" style="color: var(--text-secondary); padding: 10px 12px; font-weight: 600; border-bottom: 1px solid var(--border);">${escapeHtml(m)}</th>
+        `).join("")}
+      `;
+
+      // Rows
+      tbody.innerHTML = matrixData.setups.map(s => {
+        const cells = matrixData.mistakes.map(m => {
+          const cell = matrixData.matrix[s][m] || { pnl: 0, count: 0 };
+          let bgStyle = "";
+          let classColor = "";
+          
+          if (cell.count > 0) {
+            if (cell.pnl > 0) {
+              const intensity = Math.min(0.3, 0.05 + (cell.pnl / 3000) * 0.25);
+              bgStyle = `background: rgba(16, 185, 129, ${intensity}); border: 1px solid rgba(16, 185, 129, 0.12);`;
+              classColor = "profit";
+            } else if (cell.pnl < 0) {
+              const intensity = Math.min(0.3, 0.05 + (Math.abs(cell.pnl) / 3000) * 0.25);
+              bgStyle = `background: rgba(239, 68, 68, ${intensity}); border: 1px solid rgba(239, 68, 68, 0.12);`;
+              classColor = "loss";
+            } else {
+              bgStyle = "background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04);";
+            }
+          } else {
+            bgStyle = "background: transparent; color: var(--text-muted); opacity: 0.3;";
+          }
+
+          const pnlText = cell.count > 0 ? (cell.pnl >= 0 ? `+$${Math.round(cell.pnl)}` : `-$${Math.abs(Math.round(cell.pnl))}`) : "--";
+          const countText = cell.count > 0 ? `${cell.count} tr` : "0";
+
+          return `
+            <td align="right" style="padding: 10px 12px; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.02); ${bgStyle}">
+              <div style="font-weight: 600;" class="${classColor}">${pnlText}</div>
+              <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 2px; color: var(--text-secondary);">${countText}</div>
+            </td>
+          `;
+        }).join("");
+
+        return `
+          <tr>
+            <td align="left" class="bold" style="padding: 10px 12px; border-bottom: 1px solid var(--border); border-right: 1px solid rgba(255,255,255,0.05); font-weight: 700; color: var(--text-primary);">
+              ${escapeHtml(s)}
+            </td>
+            ${cells}
+          </tr>
+         `;
+      }).join("");
+    }
+  }
 }

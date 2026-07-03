@@ -1208,3 +1208,137 @@ export function calcDrawdownContributions(trades, startingBalance = 25000) {
     totalDeclineLoss: declineTrades.reduce((sum, t) => sum + calcNetPnl(t), 0)
   };
 }
+
+export function calcHoldTimeDiagnostics(trades) {
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  
+  let winSum = 0;
+  let winCount = 0;
+  let lossSum = 0;
+  let lossCount = 0;
+
+  executed.forEach(t => {
+    if (!t.entryDateTime || !t.exitDateTime) return;
+    const durationMins = (new Date(t.exitDateTime) - new Date(t.entryDateTime)) / (1000 * 60);
+    const pnl = calcNetPnl(t);
+    
+    if (pnl > 0) {
+      winSum += durationMins;
+      winCount++;
+    } else if (pnl < 0) {
+      lossSum += durationMins;
+      lossCount++;
+    }
+  });
+
+  const avgWinMins = winCount > 0 ? winSum / winCount : 0;
+  const avgLossMins = lossCount > 0 ? lossSum / lossCount : 0;
+  const holdTimeRatio = avgLossMins > 0 ? avgWinMins / avgLossMins : (avgWinMins > 0 ? 99.9 : 1.0);
+
+  return {
+    avgWinMins: parseFloat(avgWinMins.toFixed(1)),
+    avgLossMins: parseFloat(avgLossMins.toFixed(1)),
+    holdTimeRatio: parseFloat(holdTimeRatio.toFixed(2))
+  };
+}
+
+export function calcFatiguePivotData(trades) {
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  
+  const dayGroups = {};
+  executed.forEach(t => {
+    if (!t.entryDateTime) return;
+    const dateStr = t.entryDateTime.split("T")[0];
+    if (!dayGroups[dateStr]) dayGroups[dateStr] = [];
+    dayGroups[dateStr].push(t);
+  });
+
+  const sequenceGroups = { 1: [], 2: [], 3: [], 4: [], 5: [] };
+  
+  Object.values(dayGroups).forEach(dayTrades => {
+    const sorted = [...dayTrades].sort((a, b) => new Date(a.entryDateTime) - new Date(b.entryDateTime));
+    sorted.forEach((t, i) => {
+      const seq = Math.min(5, i + 1);
+      sequenceGroups[seq].push(t);
+    });
+  });
+
+  const sequenceExpectancies = {};
+  const sequenceCounts = {};
+  
+  for (let s = 1; s <= 5; s++) {
+    const group = sequenceGroups[s];
+    if (group.length > 0) {
+      const totalPnl = group.reduce((sum, t) => sum + calcNetPnl(t), 0);
+      sequenceExpectancies[s] = totalPnl / group.length;
+      sequenceCounts[s] = group.length;
+    } else {
+      sequenceExpectancies[s] = 0;
+      sequenceCounts[s] = 0;
+    }
+  }
+
+  let pivot = null;
+  for (let s = 1; s <= 5; s++) {
+    let allNegative = true;
+    let hasData = false;
+    for (let k = s; k <= 5; k++) {
+      if (sequenceCounts[k] > 0) {
+        hasData = true;
+        if (sequenceExpectancies[k] >= 0) {
+          allNegative = false;
+        }
+      }
+    }
+    if (allNegative && hasData) {
+      pivot = s;
+      break;
+    }
+  }
+
+  return {
+    sequenceExpectancies,
+    sequenceCounts,
+    pivot
+  };
+}
+
+export function calcSetupMistakeMatrix(trades) {
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  
+  const setups = [...new Set(executed.map(t => t.setup || "Unspecified"))].sort();
+  const mistakes = [...new Set(executed.map(t => t.mistake || "None"))].sort();
+  
+  if (!mistakes.includes("None")) {
+    mistakes.unshift("None");
+  } else {
+    const idx = mistakes.indexOf("None");
+    mistakes.splice(idx, 1);
+    mistakes.unshift("None");
+  }
+
+  const matrix = {};
+  setups.forEach(s => {
+    matrix[s] = {};
+    mistakes.forEach(m => {
+      matrix[s][m] = { pnl: 0, count: 0 };
+    });
+  });
+
+  executed.forEach(t => {
+    const s = t.setup || "Unspecified";
+    const m = t.mistake || "None";
+    const pnl = calcNetPnl(t);
+    
+    if (matrix[s] && matrix[s][m]) {
+      matrix[s][m].pnl += pnl;
+      matrix[s][m].count += 1;
+    }
+  });
+
+  return {
+    setups,
+    mistakes,
+    matrix
+  };
+}

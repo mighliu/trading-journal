@@ -3454,5 +3454,282 @@ export function renderDrawdownScatterChart(trades, startingBalance = 25000) {
   });
 }
 
+export function renderHoldTimeScatterChart(trades) {
+  const canvasId = "holdTimeScatterChart";
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+
+  if (executed.length === 0) {
+    renderEmptyChartMessage(canvasId, "No trade hold time data available");
+    return;
+  }
+
+  const winPoints = [];
+  const lossPoints = [];
+
+  executed.forEach(t => {
+    if (!t.entryDateTime || !t.exitDateTime) return;
+    const durationMins = (new Date(t.exitDateTime) - new Date(t.entryDateTime)) / (1000 * 60);
+    const pnl = calcNetPnl(t);
+
+    const pt = {
+      x: parseFloat(durationMins.toFixed(1)),
+      y: pnl,
+      meta: {
+        symbol: t.symbol,
+        direction: t.direction,
+        setup: t.setup || "Unspecified",
+        exitDate: new Date(t.exitDateTime).toLocaleDateString()
+      }
+    };
+
+    if (pnl >= 0) {
+      winPoints.push(pt);
+    } else {
+      lossPoints.push(pt);
+    }
+  });
+
+  const ctx = canvas.getContext("2d");
+  if (chartInstances[canvasId]) {
+    chartInstances[canvasId].destroy();
+  }
+
+  const isLight = document.body.classList.contains("light-theme");
+  const winColor = isLight ? "rgba(16, 185, 129, 0.65)" : "rgba(16, 185, 129, 0.7)";
+  const lossColor = isLight ? "rgba(239, 68, 68, 0.65)" : "rgba(242, 54, 69, 0.7)";
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "Wins",
+          data: winPoints,
+          backgroundColor: winColor,
+          borderColor: "#10b981",
+          borderWidth: 1.5,
+          pointRadius: 6,
+          pointHoverRadius: 9,
+          pointHitRadius: 20,
+          pointHoverBackgroundColor: "#10b981",
+          pointHoverBorderColor: "#fff",
+          pointHoverBorderWidth: 2
+        },
+        {
+          label: "Losses",
+          data: lossPoints,
+          backgroundColor: lossColor,
+          borderColor: isLight ? "#ef4444" : "#f23645",
+          borderWidth: 1.5,
+          pointRadius: 6,
+          pointHoverRadius: 9,
+          pointHitRadius: 20,
+          pointHoverBackgroundColor: isLight ? "#ef4444" : "#f23645",
+          pointHoverBorderColor: "#fff",
+          pointHoverBorderWidth: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "nearest",
+        intersect: false,
+        axis: "xy"
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: {
+            color: getTickColor(),
+            font: { family: "Inter, sans-serif", size: 10 }
+          }
+        },
+        tooltip: {
+          backgroundColor: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(18, 18, 18, 0.98)",
+          titleColor: isLight ? "#18181b" : "#f4f4f5",
+          bodyColor: isLight ? "#3f3f46" : "#e4e4e7",
+          borderColor: isLight ? "#e4e4e7" : "#27272a",
+          borderWidth: 1,
+          padding: 10,
+          displayColors: false,
+          callbacks: {
+            label: function(context) {
+              const pt = context.raw;
+              const mins = pt.x;
+              let timeStr = `${mins.toFixed(0)}m`;
+              if (mins >= 60) {
+                const hrs = Math.floor(mins / 60);
+                const remaining = Math.round(mins % 60);
+                timeStr = `${hrs}h ${remaining}m`;
+              }
+              const formatVal = (n) => {
+                const absVal = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return n >= 0 ? `$${absVal}` : `-$${absVal}`;
+              };
+              return [
+                `${pt.meta.symbol} (${pt.meta.direction.toUpperCase()}) - ${pt.meta.setup}`,
+                `P&L: ${formatVal(pt.y)}`,
+                `Duration: ${timeStr}`,
+                `Exit Date: ${pt.meta.exitDate}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: "Hold Time (Minutes)",
+            color: isLight ? "#71717a" : "#a1a1aa",
+            font: { family: "Inter, sans-serif", size: 10, weight: "bold" }
+          },
+          grid: { color: getGridColor() },
+          ticks: { color: getTickColor() },
+          min: 0
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Trade Profit / Loss ($)",
+            color: isLight ? "#71717a" : "#a1a1aa",
+            font: { family: "Inter, sans-serif", size: 10, weight: "bold" }
+          },
+          grid: { color: getGridColor() },
+          ticks: {
+            color: getTickColor(),
+            callback: value => {
+              const sign = value >= 0 ? "" : "-";
+              return `${sign}$${Math.abs(value).toLocaleString()}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+export function renderFatiguePivotChart(trades) {
+  const canvasId = "fatiguePivotChart";
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const data = calcFatiguePivotData(trades);
+  const labels = ["1st Trade", "2nd Trade", "3rd Trade", "4th Trade", "5th+ Trade"];
+  
+  const expectations = [
+    data.sequenceExpectancies[1],
+    data.sequenceExpectancies[2],
+    data.sequenceExpectancies[3],
+    data.sequenceExpectancies[4],
+    data.sequenceExpectancies[5]
+  ];
+
+  const counts = [
+    data.sequenceCounts[1],
+    data.sequenceCounts[2],
+    data.sequenceCounts[3],
+    data.sequenceCounts[4],
+    data.sequenceCounts[5]
+  ];
+
+  const hasData = counts.some(c => c > 0);
+  if (!hasData) {
+    renderEmptyChartMessage(canvasId, "No trade sequence data available");
+    return;
+  }
+
+  const ctx = canvas.getContext("2d");
+  if (chartInstances[canvasId]) {
+    chartInstances[canvasId].destroy();
+  }
+
+  const isLight = document.body.classList.contains("light-theme");
+  
+  const barBackgrounds = expectations.map(exp => {
+    if (exp >= 0) {
+      return isLight ? "rgba(16, 185, 129, 0.7)" : "rgba(16, 185, 129, 0.75)";
+    } else {
+      return isLight ? "rgba(239, 68, 68, 0.7)" : "rgba(242, 54, 69, 0.75)";
+    }
+  });
+
+  const barBorders = expectations.map(exp => (exp >= 0 ? "#10b981" : (isLight ? "#ef4444" : "#f23645")));
+
+  chartInstances[canvasId] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Expectancy ($/trade)",
+        data: expectations,
+        backgroundColor: barBackgrounds,
+        borderColor: barBorders,
+        borderWidth: 1.5,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: isLight ? "rgba(255, 255, 255, 0.98)" : "rgba(18, 18, 18, 0.98)",
+          titleColor: isLight ? "#18181b" : "#f4f4f5",
+          bodyColor: isLight ? "#3f3f46" : "#e4e4e7",
+          borderColor: isLight ? "#e4e4e7" : "#27272a",
+          borderWidth: 1,
+          padding: 10,
+          displayColors: false,
+          callbacks: {
+            label: function(context) {
+              const idx = context.dataIndex;
+              const val = expectations[idx];
+              const cnt = counts[idx];
+              const formatVal = (n) => {
+                const absVal = Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                return n >= 0 ? `$${absVal}` : `-$${absVal}`;
+              };
+              return [
+                `Avg Expectancy: ${formatVal(val)}`,
+                `Total Trades: ${cnt}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: getTickColor() }
+        },
+        y: {
+          title: {
+            display: true,
+            text: "Expectancy ($/trade)",
+            color: isLight ? "#71717a" : "#a1a1aa",
+            font: { family: "Inter, sans-serif", size: 10, weight: "bold" }
+          },
+          grid: { color: getGridColor() },
+          ticks: {
+            color: getTickColor(),
+            callback: value => {
+              const sign = value >= 0 ? "" : "-";
+              return `${sign}$${Math.abs(value).toLocaleString()}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 
 

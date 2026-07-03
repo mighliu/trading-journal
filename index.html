@@ -582,7 +582,89 @@
               <canvas id="holdTimeChart"></canvas>
             </div>
           </div>
+
+          <!-- Holding Time Excursion Plot -->
+          <div class="chart-card" style="grid-column: span 2;">
+            <div class="chart-header">
+              <h3 class="chart-title">
+                <i data-lucide="hourglass" style="color: #fbbf24"></i> Holding Time Excursion Analysis
+                <span class="tooltip-trigger" data-tooltip="Plots holding duration (X-axis) against realized profit/loss (Y-axis) for all trades. Green dots represent winning trades; red dots represent losing trades. Proves if cutting losses early and letting wins run is maintained.">
+                  <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                </span>
+              </h3>
+            </div>
+            <div class="card-body" style="padding: 16px; display: grid; grid-template-columns: 1fr 2fr; gap: 20px; min-height: 280px; flex-wrap: wrap;">
+              <!-- Left Side: hold time stats -->
+              <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.875rem; justify-content: center;">
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                  <span class="muted">Avg Win Hold Time:</span>
+                  <span id="analyticsAvgWinHold" class="bold" style="color: var(--profit);">0.0m</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                  <span class="muted">Avg Loss Hold Time:</span>
+                  <span id="analyticsAvgLossHold" class="bold" style="color: var(--loss);">0.0m</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span class="muted">
+                    Hold Time Ratio
+                    <span class="tooltip-trigger" data-tooltip="Ratio of Avg Win Hold Time to Avg Loss Hold Time. Good: >1.0 (holding wins longer than losses), Bad: <1.0.">
+                      <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                    </span>:
+                  </span>
+                  <span id="analyticsHoldTimeRatio" class="bold" style="color: var(--text-primary);">0.00</span>
+                </div>
+              </div>
+              <!-- Right Side: scatter chart -->
+              <div class="chart-container-medium" style="height: 250px; position: relative;">
+                <canvas id="holdTimeScatterChart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily Fatigue Pivot Tracker -->
+          <div class="chart-card">
+            <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <h3 class="chart-title">
+                <i data-lucide="zap-off" style="color: #f59e0b"></i> Daily Fatigue Pivot
+                <span class="tooltip-trigger" data-tooltip="Plots net expectancy against the chronological order of trades executed on each day. Helps identify late-session fatigue, revenge trading, and overtrading.">
+                  <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                </span>
+              </h3>
+              <div id="analyticsFatiguePivotBadge" class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">
+                Pivot: --
+              </div>
+            </div>
+            <div class="chart-container-medium" style="height: 250px;">
+              <canvas id="fatiguePivotChart"></canvas>
+            </div>
+          </div>
+
         </div>
+
+        <!-- Setup vs. Mistake Intersection Heatmap Matrix -->
+        <div class="chart-card" style="margin-top: 20px;">
+          <div class="chart-header">
+            <h3 class="chart-title">
+              <i data-lucide="grid" style="color: var(--accent)"></i> Setup vs. Behavioral Mistake Heatmap Matrix
+              <span class="tooltip-trigger" data-tooltip="Cross-analyzes setups against behavioral mistakes. Cell values represent Trade Count and Net P&L. Green shades represent profits; red shades represent losses. Helps isolate which entry setup is most prone to execution mistakes.">
+                <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+              </span>
+            </h3>
+          </div>
+          <div class="card-body" style="padding: 16px; overflow-x: auto;">
+            <table class="table" style="width: 100%; border-collapse: collapse; min-width: 600px; font-size: 0.825rem;">
+              <thead>
+                <tr id="setupMistakeHeaderRow">
+                  <!-- Headings injected dynamically -->
+                </tr>
+              </thead>
+              <tbody id="setupMistakeBody" style="background: transparent;">
+                <!-- Heatmap grid rows injected dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
       <!-- Intervention Edge Tab Content -->

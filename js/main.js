@@ -8,7 +8,8 @@ import {
   populateAccountSelector,
   showToast,
   renderInterventionMatrix,
-  renderRiskTab
+  renderRiskTab,
+  renderAnalyticsTab
 } from './ui.js';
 import { 
   renderCalendar, 
@@ -41,7 +42,9 @@ import {
   renderPostLossBehaviorChart,
   renderTimelineReplayChart,
   renderAdherencePerformanceChart,
-  renderDrawdownScatterChart
+  renderDrawdownScatterChart,
+  renderHoldTimeScatterChart,
+  renderFatiguePivotChart
 } from './charts.js';
 import { hasSevereDeviation } from './utils.js';
 
@@ -186,6 +189,9 @@ function renderActiveView(filteredTrades) {
     renderCumulativeSlippageChart(filteredTrades);
     renderAssetClassChart(filteredTrades);
     renderHoldTimeChart(filteredTrades);
+    renderAnalyticsTab(filteredTrades);
+    renderHoldTimeScatterChart(filteredTrades);
+    renderFatiguePivotChart(filteredTrades);
 
   } else if (currentTab === "intervention") {
     const backupStatus = AppState.activeFilters.status;
