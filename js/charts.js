@@ -177,28 +177,6 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     barData.push(net);
   }
 
-  // ── Compute swing periods ──────────────────────────────────────────────────
-  const swings = [{ index: 0, value: lineData[0] }];
-  for (let i = 1; i < lineData.length - 1; i++) {
-    const prev = lineData[i - 1];
-    const curr = lineData[i];
-    const next = lineData[i + 1];
-    if (curr > prev && curr >= next) swings.push({ index: i, value: curr, type: "peak" });
-    else if (curr < prev && curr <= next) swings.push({ index: i, value: curr, type: "trough" });
-  }
-  if (lineData.length > 1) swings.push({ index: lineData.length - 1, value: lineData[lineData.length - 1] });
-
-  const runUpPeriods    = [];
-  const drawdownPeriods = [];
-  for (let i = 0; i < swings.length - 1; i++) {
-    const from  = swings[i];
-    const to    = swings[i + 1];
-    const delta = to.value - from.value;
-    if (delta > 0.01)  runUpPeriods.push({ si: from.index, ei: to.index, sv: from.value, ev: to.value, delta });
-    if (delta < -0.01) drawdownPeriods.push({ si: from.index, ei: to.index, sv: from.value, ev: to.value, delta });
-  }
-  // ────────────────────────────────────────────────────────────────────────────
-
   const ctx = canvas.getContext("2d");
   const isProfitable = runningPnl >= 0;
   const mainColor = isProfitable ? getProfitColor() : getLossColor();
@@ -218,7 +196,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     return v >= 0 ? getProfitColor() : getLossColor();
   });
 
-  // ── Custom plugin: draw swing span lines ───────────────────────────────────
+  // ── Custom plugin: draw bottom state timeline bar ─────────────────────────
   const swingLinesPlugin = {
     id: "swingLines",
     afterDraw(chart) {
@@ -231,27 +209,28 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         return pt ? pt.x : null;
       };
 
-      const drawSpan = (si, ei, color) => {
-        const x1 = getX(si);
-        const x2 = getX(ei);
-        if (x1 === null || x2 === null || x1 === x2) return;
-        
-        // Position at the very bottom of the chart grid area
-        const y = chart.chartArea.bottom - 6;
+      const y = chart.chartArea.bottom - 6;
 
-        c.save();
+      c.save();
+      c.lineWidth = 6;
+      c.lineCap = "square";
+
+      for (let i = 0; i < lineData.length - 1; i++) {
+        const x1 = getX(i);
+        const x2 = getX(i + 1);
+        if (x1 === null || x2 === null || x1 === x2) continue;
+
+        const val1 = lineData[i];
+        const val2 = lineData[i + 1];
+        const color = ((val1 + val2) / 2) >= 0 ? getProfitColor() : getLossColor();
+
         c.beginPath();
         c.strokeStyle = color;
-        c.lineWidth = 6;
-        c.lineCap = "square";
         c.moveTo(x1, y);
         c.lineTo(x2, y);
         c.stroke();
-        c.restore();
-      };
-
-      runUpPeriods.forEach(p    => drawSpan(p.si, p.ei, getProfitColor()));
-      drawdownPeriods.forEach(p => drawSpan(p.si, p.ei, getLossColor()));
+      }
+      c.restore();
     }
   };
   // ────────────────────────────────────────────────────────────────────────────
@@ -335,15 +314,17 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
               const dd = drawdowns[index];
               const ru = runUps[index];
               
-              const inRunUp = runUpPeriods.some(p => index >= p.si && index <= p.ei);
-              const inDrawdown = drawdownPeriods.some(p => index >= p.si && index <= p.ei);
-
-              if (inDrawdown && dd < -0.01) {
+              if (cumulative < 0) {
                 lines.push(`Drawdown from Peak: -$${Math.abs(dd).toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
-              } else if (inRunUp && ru > 0.01) {
-                lines.push(`Run-up from Valley: +$${ru.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
-              } else if (dd >= -0.01) {
-                lines.push("At Peak Equity 🏆");
+              } else {
+                if (dd < -0.01) {
+                  lines.push(`Drawdown from Peak: -$${Math.abs(dd).toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+                } else {
+                  lines.push("At Peak Equity 🏆");
+                }
+                if (ru > 0.01) {
+                  lines.push(`Run-up from Valley: +$${ru.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
+                }
               }
 
               return lines;
