@@ -146,67 +146,96 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
   // Sort trades by exit datetime ascending
   const sortedTrades = [...trades].filter(t => t.status !== "skipped").sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
-  let currentBalance = startingBalance;
-  let peak = startingBalance;
-  let valley = startingBalance;
+  let runningPnl = 0;
+  let peak = 0;
+  let valley = 0;
 
   const labels = ["Start"];
-  const data = [startingBalance];
+  const lineData = [0];
+  const barData = [null]; // Start has no bar
   const drawdowns = [0];
   const runUps = [0];
 
   for (const trade of sortedTrades) {
-    currentBalance += calcNetPnl(trade);
-    if (currentBalance > peak) peak = currentBalance;
-    if (currentBalance < valley) valley = currentBalance;
+    const net = calcNetPnl(trade);
+    runningPnl += net;
+    
+    if (runningPnl > peak) peak = runningPnl;
+    if (runningPnl < valley) valley = runningPnl;
 
-    drawdowns.push(currentBalance - peak);
-    runUps.push(currentBalance - valley);
+    drawdowns.push(runningPnl - peak);
+    runUps.push(runningPnl - valley);
 
     const dateStr = new Date(trade.exitDateTime).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric"
     });
+    
     labels.push(dateStr);
-    data.push(currentBalance);
+    lineData.push(runningPnl);
+    barData.push(net);
   }
 
-  const startBal = parseFloat(startingBalance) || 25000;
   const ctx = canvas.getContext("2d");
-  const isProfitable = currentBalance >= startBal;
+  const isProfitable = runningPnl >= 0;
   const mainColor = isProfitable ? getProfitColor() : getLossColor();
   
-  // Create gradient
+  // Create gradient for cumulative line fill
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 300);
-  gradient.addColorStop(0, isProfitable ? getProfitBg(0.2) : getLossBg(0.2));
+  gradient.addColorStop(0, isProfitable ? getProfitBg(0.12) : getLossBg(0.12));
   gradient.addColorStop(1, isProfitable ? getProfitBg(0.0) : getLossBg(0.0));
 
+  // Individual trade bar colors
+  const barBackgrounds = barData.map(v => {
+    if (v === null) return "rgba(0,0,0,0)";
+    return v >= 0 ? getProfitBg(0.35) : getLossBg(0.35);
+  });
+  const barBorders = barData.map(v => {
+    if (v === null) return "rgba(0,0,0,0)";
+    return v >= 0 ? getProfitColor() : getLossColor();
+  });
+
   chartInstances[canvasId] = new Chart(ctx, {
-    type: "line",
+    type: "bar",
     data: {
       labels: labels,
-      datasets: [{
-        label: "Account Balance",
-        data: data,
-        borderColor: mainColor,
-        borderWidth: 2,
-        segment: {
-          borderColor: ctx => {
-            if (!ctx.p0 || !ctx.p1) return mainColor;
-            const p0 = ctx.p0.parsed.y;
-            const p1 = ctx.p1.parsed.y;
-            return ((p0 + p1) / 2) >= startBal ? getProfitColor() : getLossColor();
-          }
+      datasets: [
+        {
+          type: "line",
+          label: "Cumulative P&L",
+          data: lineData,
+          borderColor: mainColor,
+          borderWidth: 2,
+          segment: {
+            borderColor: ctx => {
+              if (!ctx.p0 || !ctx.p1) return mainColor;
+              const p0 = ctx.p0.parsed.y;
+              const p1 = ctx.p1.parsed.y;
+              return ((p0 + p1) / 2) >= 0 ? getProfitColor() : getLossColor();
+            }
+          },
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.15,
+          pointBackgroundColor: lineData.map(v => v >= 0 ? getProfitColor() : getLossColor()),
+          pointBorderColor: "#09090b",
+          pointBorderWidth: 1.5,
+          pointRadius: lineData.length > 50 ? 0 : 4,
+          pointHoverRadius: 6,
+          order: 1
         },
-        backgroundColor: gradient,
-        fill: true,
-        tension: 0.2,
-        pointBackgroundColor: data.map(v => v >= startBal ? getProfitColor() : getLossColor()),
-        pointBorderColor: "#09090b",
-        pointBorderWidth: 1.5,
-        pointRadius: data.length > 50 ? 0 : 4,
-        pointHoverRadius: 6
-      }]
+        {
+          type: "bar",
+          label: "Trade P&L",
+          data: barData,
+          backgroundColor: barBackgrounds,
+          borderColor: barBorders,
+          borderWidth: 1,
+          borderRadius: 2,
+          barPercentage: 0.5,
+          order: 2
+        }
+      ]
     },
     options: {
       responsive: true,
@@ -225,21 +254,20 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
           displayColors: false,
           callbacks: {
             label: function(context) {
-              const balance = context.raw;
               const index = context.dataIndex;
               if (index === 0) {
-                return `Balance: $${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+                return `Cumulative P&L: $0.00`;
               }
-              const prevBalance = context.dataset.data[index - 1];
-              const diff = balance - prevBalance;
-              const pct = prevBalance > 0 ? (diff / prevBalance) * 100 : 0;
-              const sign = diff >= 0 ? "+" : "";
-              const formattedDiff = diff.toLocaleString("en-US", { minimumFractionDigits: 2 });
-              const formattedPct = pct.toFixed(2);
+              
+              if (context.datasetIndex !== 0) return null;
+
+              const cumulative = lineData[index];
+              const tradeNet = barData[index];
+              const sign = tradeNet >= 0 ? "+" : "";
               
               const lines = [
-                `Balance: $${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-                `Change: ${sign}$${formattedDiff} (${sign}${formattedPct}%)`
+                `Cumulative P&L: ${cumulative >= 0 ? "+" : ""}${formatCurrency(cumulative)}`,
+                `Trade P&L: ${sign}${formatCurrency(tradeNet)}`
               ];
 
               const dd = drawdowns[index];
@@ -265,10 +293,11 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         },
         y: {
           grid: { color: getGridColor() },
-          ticks: { color: getTickColor(),
+          ticks: { 
+            color: getTickColor(),
             font: { family: "Inter" },
             callback: function(value) {
-              return `$${value.toLocaleString()}`;
+              return value === 0 ? "$0.00" : (value > 0 ? "+" : "") + formatCurrency(value);
             }
           }
         }
