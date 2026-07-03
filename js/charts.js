@@ -154,9 +154,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
     currentBalance += calcNetPnl(trade);
     const dateStr = new Date(trade.exitDateTime).toLocaleDateString("en-US", {
       month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
+      day: "numeric"
     });
     labels.push(dateStr);
     data.push(currentBalance);
