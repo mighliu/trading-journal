@@ -237,6 +237,65 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
   // ── Custom plugin: draw bottom state timeline bar ─────────────────────────
   const swingLinesPlugin = {
     id: "swingLines",
+    hoveredSegment: null,
+    mouseX: null,
+    mouseY: null,
+    
+    afterInit(chart) {
+      const canvas = chart.canvas;
+      
+      this.mouseMoveHandler = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        this.mouseX = e.clientX - rect.left;
+        this.mouseY = e.clientY - rect.top;
+
+        const yLine = chart.chartArea.bottom - 6;
+        if (this.mouseY >= yLine - 12 && this.mouseY <= yLine + 12) {
+          const meta = chart.getDatasetMeta(0);
+          if (!meta || !meta.data) return;
+          
+          let found = null;
+          for (let i = 0; i < lineData.length - 1; i++) {
+            const pt1 = meta.data[i];
+            const pt2 = meta.data[i + 1];
+            if (pt1 && pt2 && this.mouseX >= pt1.x && this.mouseX <= pt2.x) {
+              found = i;
+              break;
+            }
+          }
+          if (found !== this.hoveredSegment) {
+            this.hoveredSegment = found;
+            chart.draw();
+          }
+        } else {
+          if (this.hoveredSegment !== null) {
+            this.hoveredSegment = null;
+            chart.draw();
+          }
+        }
+      };
+
+      this.mouseLeaveHandler = () => {
+        if (this.hoveredSegment !== null) {
+          this.hoveredSegment = null;
+          chart.draw();
+        }
+      };
+
+      canvas.addEventListener("mousemove", this.mouseMoveHandler);
+      canvas.addEventListener("mouseleave", this.mouseLeaveHandler);
+    },
+
+    destroy(chart) {
+      const canvas = chart.canvas;
+      if (this.mouseMoveHandler) {
+        canvas.removeEventListener("mousemove", this.mouseMoveHandler);
+      }
+      if (this.mouseLeaveHandler) {
+        canvas.removeEventListener("mouseleave", this.mouseLeaveHandler);
+      }
+    },
+
     afterDraw(chart) {
       const c      = chart.ctx;
       const meta0  = chart.getDatasetMeta(0);
@@ -267,6 +326,120 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         c.stroke();
       }
       c.restore();
+
+      // Draw hovered segment custom boundary lines & tooltip card
+      if (this.hoveredSegment !== null) {
+        const color = stepColors[this.hoveredSegment];
+        const isLoss = color === getLossColor();
+
+        // Reconstruct the start and end boundary indices of the hovered swing segment
+        let si = this.hoveredSegment;
+        while (si > 0 && stepColors[si - 1] === color) {
+          si--;
+        }
+        let ei = this.hoveredSegment;
+        while (ei < stepColors.length - 1 && stepColors[ei + 1] === color) {
+          ei++;
+        }
+
+        const startIdx = si;
+        const endIdx = ei + 1;
+        const xStart = getX(startIdx);
+        const xEnd = getX(endIdx);
+
+        if (xStart !== null && xEnd !== null) {
+          c.save();
+
+          // 1. Draw boundary vertical dotted lines
+          c.beginPath();
+          c.strokeStyle = document.body.classList.contains("light-theme") ? "rgba(0, 0, 0, 0.2)" : "rgba(255, 255, 255, 0.25)";
+          c.lineWidth = 1;
+          c.setLineDash([4, 4]);
+          
+          c.moveTo(xStart, chart.chartArea.top);
+          c.lineTo(xStart, chart.chartArea.bottom);
+
+          c.moveTo(xEnd, chart.chartArea.top);
+          c.lineTo(xEnd, chart.chartArea.bottom);
+          c.stroke();
+
+          // 2. Draw card overlay
+          const cardW = 180;
+          const cardH = 75;
+          let cardX = (xStart + xEnd) / 2 - cardW / 2;
+
+          // Keep card within chart area boundaries
+          if (cardX < chart.chartArea.left) cardX = chart.chartArea.left + 5;
+          if (cardX + cardW > chart.chartArea.right) cardX = chart.chartArea.right - cardW - 5;
+
+          const cardY = chart.chartArea.bottom - cardH - 15;
+
+          // Card shadow/background
+          c.shadowColor = "rgba(0, 0, 0, 0.3)";
+          c.shadowBlur = 8;
+          c.shadowOffsetX = 0;
+          c.shadowOffsetY = 4;
+
+          c.fillStyle = document.body.classList.contains("light-theme") ? "rgba(255, 255, 255, 0.98)" : "rgba(18, 18, 18, 0.98)";
+          c.strokeStyle = document.body.classList.contains("light-theme") ? "rgba(0, 0, 0, 0.1)" : "rgba(255, 255, 255, 0.12)";
+          c.lineWidth = 1;
+
+          c.beginPath();
+          c.roundRect(cardX, cardY, cardW, cardH, 6);
+          c.fill();
+          c.shadowColor = "transparent"; // Reset shadow
+          c.stroke();
+
+          // Text content
+          c.fillStyle = document.body.classList.contains("light-theme") ? "#18181b" : "#fafafa";
+          c.font = "bold 11px Inter, sans-serif";
+          c.textAlign = "left";
+          c.textBaseline = "top";
+
+          const typeText = isLoss ? "Drawdown" : "Run-up";
+          c.fillText(typeText, cardX + 12, cardY + 12);
+
+          // Change value (right-aligned)
+          const startVal = lineData[startIdx];
+          const endVal = lineData[endIdx];
+          const change = endVal - startVal;
+          const changeText = (change >= 0 ? "+" : "") + formatCurrency(change);
+
+          c.textAlign = "right";
+          c.fillStyle = isLoss ? getLossColor() : getProfitColor();
+          c.fillText(changeText, cardX + cardW - 12, cardY + 12);
+
+          // Percentage change
+          c.font = "10px Inter, sans-serif";
+          const totalCapital = startingBalance + startVal;
+          const pct = totalCapital > 0 ? (change / totalCapital) * 100 : 0;
+          const pctText = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+          c.fillText(pctText, cardX + cardW - 12, cardY + 28);
+
+          // Date range
+          const startTrade = sortedTrades[startIdx - 1];
+          const endTrade = sortedTrades[endIdx - 1];
+
+          const formatDate = (dateStr) => {
+            if (!dateStr) return "";
+            return new Date(dateStr).toLocaleDateString("en-US", {
+              month: "short",
+              day: "2-digit",
+              year: "numeric"
+            });
+          };
+
+          const dateStart = startTrade ? formatDate(startTrade.exitDateTime) : "Start";
+          const dateEnd = endTrade ? formatDate(endTrade.exitDateTime) : "Start";
+          const rangeText = `${dateStart} - ${dateEnd}`;
+
+          c.fillStyle = document.body.classList.contains("light-theme") ? "#71717a" : "#a1a1aa";
+          c.textAlign = "left";
+          c.fillText(rangeText, cardX + 12, cardY + 50);
+
+          c.restore();
+        }
+      }
     }
   };
   // ────────────────────────────────────────────────────────────────────────────
