@@ -331,12 +331,12 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
         return pt ? pt.x : null;
       };
 
-      const y = chart.chartArea.bottom - 6;
+      const y = chart.chartArea.bottom - 4;
 
       c.save();
       
       // 1. Draw subtle background track spanning the entire grid width
-      c.lineWidth = 10;
+      c.lineWidth = 4;
       c.lineCap = "butt";
       c.beginPath();
       c.strokeStyle = document.body.classList.contains("light-theme") ? "rgba(0, 0, 0, 0.06)" : "rgba(255, 255, 255, 0.08)";
