@@ -251,6 +251,11 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
 
         const yLine = chart.chartArea.bottom - 6;
         if (this.mouseY >= yLine - 12 && this.mouseY <= yLine + 12) {
+          // Disable standard tooltip when hovering the bottom timeline bar
+          if (chart.options.plugins.tooltip.enabled !== false) {
+            chart.options.plugins.tooltip.enabled = false;
+          }
+          
           const meta = chart.getDatasetMeta(0);
           if (!meta || !meta.data) return;
           
@@ -268,6 +273,11 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
             chart.draw();
           }
         } else {
+          // Enable standard tooltip when hovering the main chart area
+          if (chart.options.plugins.tooltip.enabled !== true) {
+            chart.options.plugins.tooltip.enabled = true;
+          }
+          
           if (this.hoveredSegment !== null) {
             this.hoveredSegment = null;
             chart.draw();
@@ -276,6 +286,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
       };
 
       this.mouseLeaveHandler = () => {
+        chart.options.plugins.tooltip.enabled = true;
         if (this.hoveredSegment !== null) {
           this.hoveredSegment = null;
           chart.draw();
