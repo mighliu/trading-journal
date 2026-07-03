@@ -823,40 +823,72 @@
           <div class="chart-header">
             <h3 class="chart-title">
               <i data-lucide="shield-alert" style="color: #ef4444"></i> Drawdown & Recovery Diagnostics
-              <span class="tooltip-trigger" data-tooltip="Advanced risk analysis: Ulcer Index measures overall drawdown distress, Pain Ratio measures return relative to drawdown depth, Elevator Index compares average decline speed versus average recovery speed, and Average Time to Recovery shows the average duration of completed cycles.">
-                <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
-              </span>
             </h3>
           </div>
           <div class="card-body" style="padding: 16px; display: grid; grid-template-columns: 1fr 2fr; gap: 20px; min-height: 300px; flex-wrap: wrap;">
             <!-- Left Panel: Advanced Metrics -->
             <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.875rem; justify-content: center;">
               <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <span class="muted">Ulcer Index:</span>
+                <span class="muted">
+                  Ulcer Index
+                  <span class="tooltip-trigger" data-tooltip="Measures the depth and duration of drawdowns. Higher values indicate deeper and longer-lasting drawdowns.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskUlcerIndex" class="bold" style="color: var(--text-primary);">0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <span class="muted">Pain Index:</span>
+                <span class="muted">
+                  Pain Index
+                  <span class="tooltip-trigger" data-tooltip="The average drawdown depth across all trades, representing the typical downside exposure.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskPainIndex" class="bold" style="color: var(--text-primary);">0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <span class="muted">Pain Ratio:</span>
+                <span class="muted">
+                  Pain Ratio
+                  <span class="tooltip-trigger" data-tooltip="Ratio of net return to the Pain Index. Measures return relative to the drawdown distress endured.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskPainRatio" class="bold" style="color: var(--text-primary);">0.00</span>
               </div>
               <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <span class="muted">Avg Time to Recovery:</span>
+                <span class="muted">
+                  Avg Time to Recovery
+                  <span class="tooltip-trigger" data-tooltip="The average calendar duration and trade count spent in completed drawdown cycles before returning to peak equity.">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskAvgTtr" class="bold" style="color: var(--text-primary);">0.0 Days (0.0 trades)</span>
               </div>
               <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <span class="muted">Avg Decline Speed:</span>
+                <span class="muted">
+                  Avg Decline Speed
+                  <span class="tooltip-trigger" data-tooltip="The average rate of loss per day during decline phases (peak to trough).">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskAvgDeclineSpeed" class="bold" style="color: var(--loss);">$0.00 / day</span>
               </div>
               <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <span class="muted">Avg Recovery Speed:</span>
+                <span class="muted">
+                  Avg Recovery Speed
+                  <span class="tooltip-trigger" data-tooltip="The average rate of gain per day during recovery phases (trough to peak).">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskAvgRecoverySpeed" class="bold" style="color: var(--profit);">$0.00 / day</span>
               </div>
               <div style="display: flex; justify-content: space-between;">
-                <span class="muted">Elevator Index:</span>
+                <span class="muted">
+                  Elevator Index
+                  <span class="tooltip-trigger" data-tooltip="Ratio of decline speed to recovery speed. A value greater than 1.0 means declines are faster than recoveries (elevator down, stairs up).">
+                    <i data-lucide="help-circle" style="width: 11px; height: 11px;"></i>
+                  </span>:
+                </span>
                 <span id="riskElevatorIndex" class="bold" style="color: var(--text-primary);">0.00</span>
               </div>
             </div>
