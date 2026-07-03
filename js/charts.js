@@ -526,30 +526,15 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
               }
               
               if (context.datasetIndex !== 0) return null;
-
+              
               const cumulative = lineData[index];
               const tradeNet = barData[index];
               const sign = tradeNet >= 0 ? "+" : "";
               
-              const lines = [
+              return [
                 `Cumulative P&L: ${cumulative >= 0 ? "+" : ""}${formatCurrency(cumulative)}`,
                 `Trade P&L: ${sign}${formatCurrency(tradeNet)}`
               ];
-
-              const dd = drawdowns[index];
-              const ru = runUps[index];
-              
-              const isDrawdownPoint = index > 0 && stepColors[index - 1] === getLossColor();
-
-              if (isDrawdownPoint && dd < -0.01) {
-                lines.push(`Drawdown from Peak: -$${Math.abs(dd).toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
-              } else if (!isDrawdownPoint && ru > 0.01) {
-                lines.push(`Run-up from Valley: +$${ru.toLocaleString("en-US", { minimumFractionDigits: 2 })}`);
-              } else if (dd >= -0.01) {
-                lines.push("At Peak Equity 🏆");
-              }
-
-              return lines;
             }
           }
         }
