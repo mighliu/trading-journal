@@ -450,7 +450,7 @@ export function renderTradeLog(trades, page = 1) {
     }
 
     let comparisonMarkup = "";
-    if (t.signalEntryPrice != null || t.signalExitPrice != null) {
+    if (t.status !== "skipped" && (t.signalEntryPrice != null || t.signalExitPrice != null)) {
       const sigEntry = t.signalEntryPrice != null ? t.signalEntryPrice : t.entryPrice;
       const sigExit = t.signalExitPrice != null ? t.signalExitPrice : t.exitPrice;
       const actEntry = t.entryPrice;

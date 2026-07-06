@@ -183,7 +183,7 @@ export function openDayPanel(dateStr, trades) {
     const escapedNotes = escapeHtml(t.notes);
 
     let signalDiffHtml = "";
-    if (t.signalEntryPrice != null || t.signalExitPrice != null) {
+    if (t.status !== "skipped" && (t.signalEntryPrice != null || t.signalExitPrice != null)) {
       const sigPnl = calcSignalPnl(t);
       const diff = sigPnl - netPnl;
       const diffClass = diff < 0 ? "profit" : diff > 0 ? "loss" : "";
