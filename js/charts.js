@@ -2311,8 +2311,9 @@ export function renderHoldTimeChart(trades) {
 
 export function renderMfeMaeCharts(trades) {
   // Sort executed trades globally to ensure trade number consistency
+  const currentAccount = AppState.settings.currentAccount || "Personal";
   const allExecuted = AppState.trades
-    .filter(x => x.status === "executed")
+    .filter(x => x.accountId === currentAccount && x.status === "executed")
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   // 1. MFE Scatter
@@ -3510,8 +3511,9 @@ export function renderHoldTimeScatterChart(trades) {
   }
 
   // Sort executed trades globally to ensure trade number consistency
+  const currentAccount = AppState.settings.currentAccount || "Personal";
   const allExecuted = AppState.trades
-    .filter(x => x.status === "executed")
+    .filter(x => x.accountId === currentAccount && x.status === "executed")
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   const dataPoints = [];

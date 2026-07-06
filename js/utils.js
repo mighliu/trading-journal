@@ -741,8 +741,9 @@ export function calcMae(trade) {
 
 export function isRevengeTrade(trade, allTrades) {
   if (trade.status !== "executed") return false;
+  const accId = trade.accountId || "Personal";
   const sorted = [...allTrades]
-    .filter(t => t.status === "executed")
+    .filter(t => t.status === "executed" && (t.accountId || "Personal") === accId)
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
   const idx = sorted.findIndex(t => t.id === trade.id);
   if (idx <= 0) return false;
