@@ -1638,7 +1638,9 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
           borderWidth: 2,
           tension: 0.15,
           pointBackgroundColor: getAccentColor(),
-          pointRadius: actualData.length < 20 ? 4 : 1
+          pointRadius: actualData.length < 20 ? 4 : 1,
+          pointHoverRadius: 6,
+          pointHitRadius: 12
         },
         {
           label: "Pure Strategy Performance",
@@ -1649,13 +1651,19 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
           borderDash: [5, 5],
           tension: 0.15,
           pointBackgroundColor: getProfitColor(),
-          pointRadius: strategyData.length < 20 ? 4 : 1
+          pointRadius: strategyData.length < 20 ? 4 : 1,
+          pointHoverRadius: 6,
+          pointHitRadius: 12
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: {
           display: true,
@@ -1751,6 +1759,10 @@ export function renderInterventionAttributionChart(trades) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1847,6 +1859,10 @@ export function renderInterventionHourlyChart(trades) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -1953,6 +1969,10 @@ export function renderInterventionStreakChart(trades) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -2044,7 +2064,9 @@ export function renderAdherenceDrawdownChart(trades, startingBalance = 25000) {
           borderWidth: 2,
           yAxisID: "yAdherence",
           tension: 0.15,
-          pointRadius: adherenceData.length < 20 ? 3 : 0
+          pointRadius: adherenceData.length < 20 ? 3 : 0,
+          pointHoverRadius: 6,
+          pointHitRadius: 12
         },
         {
           label: "Actual Drawdown (%)",
@@ -2055,13 +2077,19 @@ export function renderAdherenceDrawdownChart(trades, startingBalance = 25000) {
           fill: true,
           yAxisID: "yDrawdown",
           tension: 0.15,
-          pointRadius: drawdownData.length < 20 ? 3 : 0
+          pointRadius: drawdownData.length < 20 ? 3 : 0,
+          pointHoverRadius: 6,
+          pointHitRadius: 12
         }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
       plugins: {
         legend: {
           display: true,
