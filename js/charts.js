@@ -1681,6 +1681,20 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
               const label = context.dataset.label || "";
               const val = context.raw;
               return `${label}: $${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+            },
+            footer: function(tooltipItems) {
+              let actual = null;
+              let strategy = null;
+              tooltipItems.forEach(item => {
+                if (item.datasetIndex === 0) actual = item.raw;
+                if (item.datasetIndex === 1) strategy = item.raw;
+              });
+              if (actual !== null && strategy !== null) {
+                const delta = actual - strategy;
+                const sign = delta >= 0 ? "+" : "";
+                return `Trader Delta: ${sign}$${delta.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+              }
+              return '';
             }
           }
         }
