@@ -67,30 +67,7 @@ class StateManager {
           t.status = "executed";
           needsSave = true;
         }
-        if (t.maxPrice == null || t.minPrice == null) {
-          const higher = Math.max(t.entryPrice, t.exitPrice);
-          const lower = Math.min(t.entryPrice, t.exitPrice);
-          const diff = higher - lower;
-          
-          if (t.direction === "long") {
-            t.maxPrice = parseFloat((higher + (diff > 0 ? diff * (0.1 + Math.random() * 0.8) : higher * 0.015)).toFixed(2));
-            let stopVal = t.stopLoss || (lower * 0.95);
-            if (t.exitPrice <= stopVal) {
-              t.minPrice = t.exitPrice;
-            } else {
-              t.minPrice = parseFloat((lower - (lower - stopVal) * (Math.random() * 0.8)).toFixed(2));
-            }
-          } else {
-            t.minPrice = parseFloat((lower - (diff > 0 ? diff * (0.1 + Math.random() * 0.8) : lower * 0.015)).toFixed(2));
-            let stopVal = t.stopLoss || (higher * 1.05);
-            if (t.exitPrice >= stopVal) {
-              t.maxPrice = t.exitPrice;
-            } else {
-              t.maxPrice = parseFloat((higher + (stopVal - higher) * (Math.random() * 0.8)).toFixed(2));
-            }
-          }
-          needsSave = true;
-        }
+
       });
       if (needsSave) {
         this.saveToStorage();
