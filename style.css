@@ -272,6 +272,18 @@ input:focus, select:focus, textarea:focus {
   display: inline-block;
 }
 
+/* Invisible mouse bridge to bridge the hover gap between button and dropdown content */
+.dropdown::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 8px;
+  background: transparent;
+  z-index: 105;
+}
+
 .dropdown-content {
   display: none;
   position: absolute;
