@@ -1090,7 +1090,7 @@ export function setupUIListeners() {
   if (cancelSettingsBtn) cancelSettingsBtn.addEventListener("click", closeSettingsModal);
 
   // Overlay click logic (close modal when clicking outside)
-  const addTradeModal = document.getElementById("addTradeModal");
+  const addTradeModal = document.getElementById("tradeModal");
   const settingsModal = document.getElementById("settingsModal");
   if (addTradeModal) {
     addTradeModal.addEventListener("click", (e) => {
