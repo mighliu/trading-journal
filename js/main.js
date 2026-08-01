@@ -45,7 +45,8 @@ import {
   renderTimelineReplayChart,
   renderAdherencePerformanceChart,
   renderDrawdownScatterChart,
-  renderMonteCarloChart
+  renderMonteCarloChart,
+  destroyAllCharts
 } from './charts.js';
 import { compressImage, hasSevereDeviation } from './utils.js';
 
