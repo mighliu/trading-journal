@@ -386,11 +386,28 @@ class StateManager {
 
         // If maxPrice or minPrice is absurdly out of range (> 1.35x or < 0.5x entry price), reset it
         if (maxP != null && (maxP > entry * 1.35 || maxP < entry * 0.5)) {
-          t.maxPrice = null;
+          maxP = null;
           modified = true;
         }
         if (minP != null && (minP > entry * 1.35 || minP < entry * 0.5)) {
-          t.minPrice = null;
+          minP = null;
+          modified = true;
+        }
+
+        if (maxP == null || minP == null) {
+          const higher = Math.max(entry, exit);
+          const lower = Math.min(entry, exit);
+          const diff = higher - lower;
+          
+          if (t.direction === "long") {
+            maxP = parseFloat((higher + (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
+            minP = parseFloat((lower - (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
+          } else {
+            minP = parseFloat((lower - (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
+            maxP = parseFloat((higher + (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
+          }
+          t.maxPrice = maxP;
+          t.minPrice = minP;
           modified = true;
         }
       }

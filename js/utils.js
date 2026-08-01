@@ -662,19 +662,21 @@ function isPlausiblePrice(price, refPrice) {
 export function calcMfePct(trade) {
   if (!trade.entryPrice || isSkippedTrade(trade)) return null;
   const entry = parseFloat(trade.entryPrice);
-  const exit = parseFloat(trade.exitPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || entry;
   if (isNaN(entry) || entry === 0) return null;
   
   if (trade.direction === "long") {
-    if (!trade.maxPrice) return null;
-    const rawMax = parseFloat(trade.maxPrice);
-    if (!isPlausiblePrice(rawMax, entry)) return null;
+    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
+    if (!isPlausiblePrice(rawMax, entry)) {
+      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
+    }
     const maxVal = Math.max(rawMax, entry, exit);
     return ((maxVal - entry) / entry) * 100;
   } else {
-    if (!trade.minPrice) return null;
-    const rawMin = parseFloat(trade.minPrice);
-    if (!isPlausiblePrice(rawMin, entry)) return null;
+    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
+    if (!isPlausiblePrice(rawMin, entry)) {
+      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
+    }
     const minVal = Math.min(rawMin, entry, exit);
     return ((entry - minVal) / entry) * 100;
   }
@@ -683,19 +685,21 @@ export function calcMfePct(trade) {
 export function calcMaePct(trade) {
   if (!trade.entryPrice || isSkippedTrade(trade)) return null;
   const entry = parseFloat(trade.entryPrice);
-  const exit = parseFloat(trade.exitPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || entry;
   if (isNaN(entry) || entry === 0) return null;
   
   if (trade.direction === "long") {
-    if (!trade.minPrice) return null;
-    const rawMin = parseFloat(trade.minPrice);
-    if (!isPlausiblePrice(rawMin, entry)) return null;
+    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
+    if (!isPlausiblePrice(rawMin, entry)) {
+      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
+    }
     const minVal = Math.min(rawMin, entry, exit);
     return ((entry - minVal) / entry) * 100;
   } else {
-    if (!trade.maxPrice) return null;
-    const rawMax = parseFloat(trade.maxPrice);
-    if (!isPlausiblePrice(rawMax, entry)) return null;
+    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
+    if (!isPlausiblePrice(rawMax, entry)) {
+      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
+    }
     const maxVal = Math.max(rawMax, entry, exit);
     return ((maxVal - entry) / entry) * 100;
   }
@@ -706,11 +710,10 @@ export function calcMfe(trade) {
 
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
-  const exit = parseFloat(trade.exitPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || entry;
 
   if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
     const val = parseFloat(trade.mfe);
-    // Sanity check: single trade MFE should be reasonable (< $20k for standard retail trades)
     if (val >= 0 && val < 20000) {
       return val;
     }
@@ -720,15 +723,17 @@ export function calcMfe(trade) {
   const mult = getEffectiveMultiplier(trade);
   
   if (trade.direction === "long") {
-    if (!trade.maxPrice) return null;
-    const rawMax = parseFloat(trade.maxPrice);
-    if (!isPlausiblePrice(rawMax, entry)) return null;
+    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
+    if (!isPlausiblePrice(rawMax, entry)) {
+      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
+    }
     const maxVal = Math.max(rawMax, entry, exit);
     return (maxVal - entry) * qty * mult;
   } else {
-    if (!trade.minPrice) return null;
-    const rawMin = parseFloat(trade.minPrice);
-    if (!isPlausiblePrice(rawMin, entry)) return null;
+    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
+    if (!isPlausiblePrice(rawMin, entry)) {
+      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
+    }
     const minVal = Math.min(rawMin, entry, exit);
     return (entry - minVal) * qty * mult;
   }
@@ -739,7 +744,7 @@ export function calcMae(trade) {
 
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
-  const exit = parseFloat(trade.exitPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || entry;
 
   if (trade.mae != null && !isNaN(parseFloat(trade.mae))) {
     const val = parseFloat(trade.mae);
@@ -752,15 +757,17 @@ export function calcMae(trade) {
   const mult = getEffectiveMultiplier(trade);
   
   if (trade.direction === "long") {
-    if (!trade.minPrice) return null;
-    const rawMin = parseFloat(trade.minPrice);
-    if (!isPlausiblePrice(rawMin, entry)) return null;
+    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
+    if (!isPlausiblePrice(rawMin, entry)) {
+      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
+    }
     const minVal = Math.min(rawMin, entry, exit);
     return (entry - minVal) * qty * mult;
   } else {
-    if (!trade.maxPrice) return null;
-    const rawMax = parseFloat(trade.maxPrice);
-    if (!isPlausiblePrice(rawMax, entry)) return null;
+    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
+    if (!isPlausiblePrice(rawMax, entry)) {
+      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
+    }
     const maxVal = Math.max(rawMax, entry, exit);
     return (maxVal - entry) * qty * mult;
   }
