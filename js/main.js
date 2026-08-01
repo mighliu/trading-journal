@@ -86,8 +86,7 @@ function handleStateChange() {
   const allTrades = AppState.trades;
 
   // Sync filter dropdowns UI
-  const datePresetElem = document.getElementById("filterDatePreset");
-  if (datePresetElem) datePresetElem.value = AppState.activeFilters.datePreset || "allTime";
+  syncFilterUI();
 
   // Sync accounts list
   populateAccountSelector();
@@ -136,6 +135,29 @@ function handleStateChange() {
 
   // Handle seed notice toggle
   toggleSeedNotice();
+}
+
+function syncFilterUI() {
+  const datePresetElem = document.getElementById("filterDatePreset");
+  if (datePresetElem) datePresetElem.value = AppState.activeFilters.datePreset || "allTime";
+
+  const symbolElem = document.getElementById("filterSymbol");
+  if (symbolElem && document.activeElement !== symbolElem) symbolElem.value = AppState.activeFilters.symbol || "";
+
+  const dirElem = document.getElementById("filterDirection");
+  if (dirElem) dirElem.value = AppState.activeFilters.direction || "all";
+
+  const assetElem = document.getElementById("filterAssetClass");
+  if (assetElem) assetElem.value = AppState.activeFilters.assetClass || "all";
+
+  const statusElem = document.getElementById("filterStatus");
+  if (statusElem) statusElem.value = AppState.activeFilters.status || "executed";
+
+  const outcomeElem = document.getElementById("filterOutcome");
+  if (outcomeElem) outcomeElem.value = AppState.activeFilters.outcome || "all";
+
+  const setupElem = document.getElementById("filterSetup");
+  if (setupElem) setupElem.value = AppState.activeFilters.setup || "all";
 }
 
 function setupTabRouting() {

@@ -707,7 +707,7 @@ class StateManager {
     const activeAccount = this.settings.currentAccount || "Personal";
     list = list.filter(t => (t.accountId || "Personal") === activeAccount);
 
-    const baseDate = new Date("2026-06-29T17:34:00");
+    const baseDate = new Date();
     let startLimit = null;
     let endLimit = null;
 
@@ -762,7 +762,17 @@ class StateManager {
     }
 
     if (this.activeFilters.status && this.activeFilters.status !== "all") {
-      list = list.filter(t => (t.status || "executed") === this.activeFilters.status);
+      list = list.filter(t => {
+        const s = String(t.status || "executed").toLowerCase().trim();
+        const targetS = String(this.activeFilters.status).toLowerCase().trim();
+        if (targetS === "executed") {
+          return s === "executed" || s === "closed" || s === "filled" || s === "taken" || s === "win" || s === "loss" || s === "";
+        }
+        if (targetS === "skipped") {
+          return s === "skipped" || s === "cancelled" || s === "canceled" || s === "rejected" || s === "invalid";
+        }
+        return s === targetS;
+      });
     }
 
     return list.sort((a, b) => new Date(b.exitDateTime) - new Date(a.exitDateTime));
