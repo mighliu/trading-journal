@@ -772,43 +772,27 @@ export function calcMfe(trade) {
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
 
   const mult = getEffectiveMultiplier(trade);
-  const netPnl = calcNetPnl(trade);
+  const dir = String(trade.direction || "long").toLowerCase();
 
-  // 1. Direct dollar MFE (e.g. from imported CSV or form input)
-  if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
-    const rawMfe = parseFloat(trade.mfe);
-    // Sanity check: if MFE is wildly larger than entry price or net PnL (e.g. shifted cumulative profit column)
-    if (entry > 0 && rawMfe > entry * 1.5 && Math.abs(netPnl) < entry * 0.5) {
-      return Math.max(0, trade.direction === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult);
-    }
-    return Math.max(0, rawMfe);
+  // Determine peak price/excursion value from trade fields
+  let val = trade.mfe != null ? parseFloat(trade.mfe) : (dir === "long" ? parseFloat(trade.maxPrice) : parseFloat(trade.minPrice));
+
+  if (val == null || isNaN(val)) {
+    return Math.max(0, dir === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult);
   }
 
-  // 2. Compute from maxPrice
-  if (trade.direction === "long") {
-    if (trade.maxPrice == null) return Math.max(0, (exit - entry) * qty * mult);
-    const rawMax = parseFloat(trade.maxPrice);
-    if (isNaN(rawMax)) return Math.max(0, (exit - entry) * qty * mult);
-
-    // Guard against shifted column or invalid price scale
-    if (rawMax > entry * 3 && entry > 5 && Math.abs(exit - entry) < entry * 0.5) {
-      return Math.max(0, (exit - entry) * qty * mult);
+  // Case A: val is a price level (e.g. 50,558.50 for entry 50,402.50 or 185.00 for entry 180.00)
+  if (entry > 0 && val > entry * 0.1) {
+    if (val > entry * 3) {
+      // Out of bounds / shifted cumulative column error from import
+      return Math.max(0, dir === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult);
     }
-
-    const maxVal = Math.max(rawMax, entry, exit);
-    return Math.max(0, (maxVal - entry) * qty * mult);
-  } else {
-    if (trade.minPrice == null) return Math.max(0, (entry - exit) * qty * mult);
-    const rawMin = parseFloat(trade.minPrice);
-    if (isNaN(rawMin) || rawMin === 0) return Math.max(0, (entry - exit) * qty * mult);
-
-    if (rawMin > entry * 3 && entry > 5 && Math.abs(exit - entry) < entry * 0.5) {
-      return Math.max(0, (entry - exit) * qty * mult);
-    }
-
-    const minVal = Math.min(rawMin, entry, exit);
-    return Math.max(0, (entry - minVal) * qty * mult);
+    const excursionPoints = dir === "long" ? Math.max(0, val - entry) : Math.max(0, entry - val);
+    return excursionPoints * qty * mult;
   }
+
+  // Case B: val is already a dollar excursion amount
+  return Math.max(0, val);
 }
 
 export function calcMae(trade) {
@@ -821,41 +805,25 @@ export function calcMae(trade) {
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
 
   const mult = getEffectiveMultiplier(trade);
-  const netPnl = calcNetPnl(trade);
+  const dir = String(trade.direction || "long").toLowerCase();
 
-  // 1. Direct dollar MAE
-  if (trade.mae != null && !isNaN(parseFloat(trade.mae))) {
-    const rawMae = parseFloat(trade.mae);
-    if (entry > 0 && rawMae > entry * 1.5 && Math.abs(netPnl) < entry * 0.5) {
-      return Math.max(0, trade.direction === "long" ? (entry - exit) * qty * mult : (exit - entry) * qty * mult);
-    }
-    return Math.abs(rawMae);
+  let val = trade.mae != null ? parseFloat(trade.mae) : (dir === "long" ? parseFloat(trade.minPrice) : parseFloat(trade.maxPrice));
+
+  if (val == null || isNaN(val)) {
+    return Math.max(0, dir === "long" ? (entry - exit) * qty * mult : (exit - entry) * qty * mult);
   }
 
-  // 2. Compute from minPrice / maxPrice
-  if (trade.direction === "long") {
-    if (trade.minPrice == null) return Math.max(0, (entry - exit) * qty * mult);
-    const rawMin = parseFloat(trade.minPrice);
-    if (isNaN(rawMin)) return Math.max(0, (entry - exit) * qty * mult);
-
-    if (rawMin > entry * 3 && entry > 5 && Math.abs(exit - entry) < entry * 0.5) {
-      return Math.max(0, (entry - exit) * qty * mult);
+  // Case A: val is a price level (e.g. 50,384.00 for entry 50,402.50 or 179.00 for entry 180.00)
+  if (entry > 0 && val > entry * 0.1) {
+    if (val > entry * 3) {
+      return Math.max(0, dir === "long" ? (entry - exit) * qty * mult : (exit - entry) * qty * mult);
     }
-
-    const minVal = Math.min(rawMin, entry, exit);
-    return Math.max(0, (entry - minVal) * qty * mult);
-  } else {
-    if (trade.maxPrice == null) return Math.max(0, (exit - entry) * qty * mult);
-    const rawMax = parseFloat(trade.maxPrice);
-    if (isNaN(rawMax)) return Math.max(0, (exit - entry) * qty * mult);
-
-    if (rawMax > entry * 3 && entry > 5 && Math.abs(exit - entry) < entry * 0.5) {
-      return Math.max(0, (exit - entry) * qty * mult);
-    }
-
-    const maxVal = Math.max(rawMax, entry, exit);
-    return Math.max(0, (maxVal - entry) * qty * mult);
+    const excursionPoints = dir === "long" ? Math.max(0, entry - val) : Math.max(0, val - entry);
+    return excursionPoints * qty * mult;
   }
+
+  // Case B: val is already a dollar excursion amount
+  return Math.max(0, Math.abs(val));
 }
 
 export function isRevengeTrade(trade, allTrades) {
