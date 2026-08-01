@@ -1364,17 +1364,28 @@ export function calcSetupMistakeMatrix(trades) {
   };
 }
 
-export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns = 500, horizon = 50) {
-  const executed = trades.filter(t => !isSkippedTrade(t));
-  if (executed.length === 0) {
+export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns = 500, customHorizon = null) {
+  const executed = trades
+    .filter(t => !isSkippedTrade(t))
+    .sort((a, b) => new Date(a.exitDateTime || a.entryDateTime) - new Date(b.exitDateTime || b.entryDateTime));
+
+  const actualTradeCount = executed.length;
+  const horizon = customHorizon || Math.max(50, actualTradeCount);
+
+  if (actualTradeCount === 0) {
     return {
       runs: [],
-      p95: [],
-      p50: [],
-      p5: [],
-      maxDrawdownDist: [],
+      p95: Array(horizon + 1).fill(startingBalance),
+      p50: Array(horizon + 1).fill(startingBalance),
+      p5: Array(horizon + 1).fill(startingBalance),
+      actualEquityPath: [startingBalance],
+      actualFinalEquity: startingBalance,
+      actualPercentileRank: 50,
+      maxDrawdowns: [],
       profitProbability: 0,
-      avgFinalEquity: startingBalance
+      avgFinalEquity: startingBalance,
+      horizon,
+      actualTradeCount: 0
     };
   }
 
@@ -1401,6 +1412,15 @@ export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns
     maxDrawdowns.push(maxDd);
   }
 
+  // Calculate actual cumulative equity path
+  const actualEquityPath = [startingBalance];
+  let currentActual = startingBalance;
+  for (const t of executed) {
+    currentActual += calcNetPnl(t);
+    actualEquityPath.push(currentActual);
+  }
+  const actualFinalEquity = currentActual;
+
   // Calculate percentiles at each step
   const p95 = [];
   const p50 = [];
@@ -1413,6 +1433,12 @@ export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns
     p95.push(stepValues[Math.floor(numRuns * 0.95)]);
   }
 
+  // Compare actual performance against simulated paths at step N
+  const compareStep = Math.min(actualTradeCount, horizon);
+  const simAtCompareStep = runs.map(run => run[compareStep]).sort((a, b) => a - b);
+  const lesserOrEqualCount = simAtCompareStep.filter(val => val <= actualFinalEquity).length;
+  const actualPercentileRank = Math.round((lesserOrEqualCount / numRuns) * 100);
+
   const profitableRuns = runs.filter(run => run[run.length - 1] > startingBalance).length;
   const profitProbability = (profitableRuns / numRuns) * 100;
   const avgFinalEquity = runs.reduce((sum, run) => sum + run[run.length - 1], 0) / numRuns;
@@ -1422,9 +1448,14 @@ export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns
     p95,
     p50,
     p5,
+    actualEquityPath,
+    actualFinalEquity,
+    actualPercentileRank,
     maxDrawdowns,
     profitProbability,
-    avgFinalEquity
+    avgFinalEquity,
+    horizon,
+    actualTradeCount
   };
 }
 

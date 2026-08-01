@@ -1023,10 +1023,14 @@
               <h3 class="chart-title"><i data-lucide="shuffle" style="color: #6366f1"></i> Monte Carlo Equity Simulator (500 Random Resamples) <span class="tooltip-trigger" data-tooltip="Simulates 500 randomized future trading paths using your actual historical return distribution to project 95th percentile, median, and 5th percentile drawdown risks."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
               <button type="button" id="runMonteCarloBtn" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i> Re-Run Simulation</button>
             </div>
-            <div id="monteCarloStatsBar" style="display: flex; gap: 16px; font-size: 0.8125rem; color: var(--text-secondary); flex-wrap: wrap;">
+            <div id="monteCarloStatsBar" style="display: flex; gap: 14px; font-size: 0.8125rem; color: var(--text-secondary); flex-wrap: wrap; align-items: center;">
+              <span>Actual Equity: <strong id="mcActualEquity" style="color: #38bdf8;">$--</strong></span>
+              <span>•</span>
+              <span>Actual vs Sim: <strong id="mcActualPercentile" style="color: #818cf8;">--th Percentile</strong></span>
+              <span>•</span>
               <span>Prob. of Profit: <strong id="mcProfitProb" style="color: var(--profit);">--%</strong></span>
               <span>•</span>
-              <span>Avg Final Equity: <strong id="mcAvgEquity">$--</strong></span>
+              <span>Sim. Avg Equity: <strong id="mcAvgEquity">$--</strong></span>
               <span>•</span>
               <span>95th Percentile: <strong id="mcP95" style="color: var(--profit);">$--</strong></span>
               <span>•</span>

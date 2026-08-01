@@ -3812,21 +3812,58 @@ export function renderMonteCarloChart(trades, startingBalance = 25000) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const simResult = runMonteCarloSimulation(trades, startingBalance, 500, 50);
+  const simResult = runMonteCarloSimulation(trades, startingBalance, 500);
   
   const probElem = document.getElementById("mcProfitProb");
   const avgEqElem = document.getElementById("mcAvgEquity");
   const p95Elem = document.getElementById("mcP95");
   const p5Elem = document.getElementById("mcP5");
+  const actualEqElem = document.getElementById("mcActualEquity");
+  const actualPercElem = document.getElementById("mcActualPercentile");
 
   if (probElem) probElem.textContent = `${simResult.profitProbability.toFixed(1)}%`;
   if (avgEqElem) avgEqElem.textContent = `$${Math.round(simResult.avgFinalEquity).toLocaleString()}`;
   if (p95Elem) p95Elem.textContent = `$${Math.round(simResult.p95[simResult.p95.length - 1] || startingBalance).toLocaleString()}`;
   if (p5Elem) p5Elem.textContent = `$${Math.round(simResult.p5[simResult.p5.length - 1] || startingBalance).toLocaleString()}`;
 
-  const labels = Array.from({ length: 51 }, (_, i) => `Trade ${i}`);
+  if (actualEqElem) {
+    const actPnl = simResult.actualFinalEquity - startingBalance;
+    const actSign = actPnl >= 0 ? "+" : "";
+    actualEqElem.textContent = `$${Math.round(simResult.actualFinalEquity).toLocaleString()} (${actSign}$${Math.round(actPnl).toLocaleString()})`;
+    actualEqElem.style.color = actPnl >= 0 ? "var(--profit)" : "var(--loss)";
+  }
+
+  if (actualPercElem) {
+    const rank = simResult.actualPercentileRank;
+    const suffix = (rank % 10 === 1 && rank !== 11) ? "st" : (rank % 10 === 2 && rank !== 12) ? "nd" : (rank % 10 === 3 && rank !== 13) ? "rd" : "th";
+    actualPercElem.textContent = `${rank}${suffix} Percentile`;
+    actualPercElem.style.color = rank >= 50 ? "#818cf8" : "#ef4444";
+  }
+
+  const horizon = simResult.horizon || 50;
+  const labels = Array.from({ length: horizon + 1 }, (_, i) => i === 0 ? "Start" : `Trade ${i}`);
+
+  // Build actual data array aligned with horizon labels
+  const actualSeriesData = Array.from({ length: horizon + 1 }, (_, i) => {
+    return i < simResult.actualEquityPath.length ? simResult.actualEquityPath[i] : null;
+  });
 
   const datasets = [
+    {
+      label: "Actual Realized Equity",
+      data: actualSeriesData,
+      borderColor: "#38bdf8",
+      backgroundColor: "rgba(56, 189, 248, 0.15)",
+      borderWidth: 3,
+      pointRadius: (ctx) => {
+        const idx = ctx.dataIndex;
+        if (idx === 0 || idx === simResult.actualEquityPath.length - 1) return 4;
+        return 0;
+      },
+      pointBackgroundColor: "#38bdf8",
+      tension: 0.1,
+      order: 1
+    },
     {
       label: "95th Percentile (Best Case)",
       data: simResult.p95,
@@ -3834,15 +3871,18 @@ export function renderMonteCarloChart(trades, startingBalance = 25000) {
       backgroundColor: "rgba(52, 211, 153, 0.05)",
       borderWidth: 2,
       pointRadius: 0,
-      fill: "+1"
+      fill: "+1",
+      order: 2
     },
     {
       label: "50th Percentile (Median Path)",
       data: simResult.p50,
       borderColor: "#818cf8",
       backgroundColor: "transparent",
-      borderWidth: 2.5,
-      pointRadius: 0
+      borderWidth: 2,
+      borderDash: [4, 4],
+      pointRadius: 0,
+      order: 3
     },
     {
       label: "5th Percentile (Worst Case Risk)",
@@ -3851,7 +3891,8 @@ export function renderMonteCarloChart(trades, startingBalance = 25000) {
       backgroundColor: "rgba(239, 68, 68, 0.05)",
       borderWidth: 2,
       pointRadius: 0,
-      fill: false
+      fill: false,
+      order: 4
     }
   ];
 
@@ -3870,7 +3911,10 @@ export function renderMonteCarloChart(trades, startingBalance = 25000) {
         },
         tooltip: {
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: $${Math.round(ctx.parsed.y).toLocaleString()}`
+            label: (ctx) => {
+              if (ctx.parsed.y === null || ctx.parsed.y === undefined) return "";
+              return `${ctx.dataset.label}: $${Math.round(ctx.parsed.y).toLocaleString()}`;
+            }
           }
         }
       },
