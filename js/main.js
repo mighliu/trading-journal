@@ -47,7 +47,7 @@ import {
   renderDrawdownScatterChart,
   renderMonteCarloChart
 } from './charts.js';
-import { compressImage } from './utils.js';
+import { compressImage, hasSevereDeviation } from './utils.js';
 
 let currentTab = "dashboard";
 const calendarToday = new Date("2026-06-29T17:34:00"); // Base date context
