@@ -688,19 +688,6 @@ class StateManager {
     this.notify();
   }
 
-  
-  subscribe(listener) {
-    if (typeof listener === "function" && !this.listeners.includes(listener)) {
-      this.listeners.push(listener);
-    }
-  }
-
-  notify() {
-    this.listeners.forEach(fn => {
-      try { fn(); } catch(e) { console.error("Error in state subscriber:", e); }
-    });
-  }
-
   getFilteredTrades() {
     let list = [...this.trades];
 
