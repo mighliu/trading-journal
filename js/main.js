@@ -247,6 +247,8 @@ function renderActiveView(filteredTrades) {
     const tradesForRisk = AppState.getFilteredTrades();
     AppState.activeFilters.status = backupStatus;
 
+    console.debug("[renderActiveView:risk] tradesForRisk:", tradesForRisk.length, "statuses:", [...new Set(tradesForRisk.map(t => t.status))], "account:", AppState.settings.currentAccount);
+
     renderRiskTab(tradesForRisk);
     renderMonteCarloChart(tradesForRisk, AppState.settings.startingBalance);
     renderMfeMaeCharts(tradesForRisk);

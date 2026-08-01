@@ -2962,6 +2962,7 @@ export function renderPostLossBehaviorChart(trades) {
   if (!canvas) return;
 
   const stats = calcPostLossPerformance(trades);
+  console.debug("[PostLoss] trades in:", trades.length, "afterWin:", stats.afterWin.count, "afterLoss:", stats.afterLoss.count, "statuses:", [...new Set(trades.map(t=>t.status))]);
 
   if (stats.afterWin.count === 0 && stats.afterLoss.count === 0) {
     renderEmptyChartMessage(canvasId, "No post-win/loss sequence outcomes recorded yet.");
@@ -3060,6 +3061,7 @@ export function renderTimelineReplayChart(trades) {
   if (!canvas) return;
 
   const executedTrades = trades.filter(t => isExecutedTrade(t));
+  console.debug("[TimelineReplay] trades in:", trades.length, "executed:", executedTrades.length, "statuses:", [...new Set(trades.map(t=>t.status))]);
   if (executedTrades.length === 0) {
     renderEmptyChartMessage(canvasId, "No executed trades available for timeline replay.");
     return;
@@ -3221,6 +3223,7 @@ export function renderAdherencePerformanceChart(trades) {
   const avgPnls = [getAvgPnl(highTrades), getAvgPnl(medTrades), getAvgPnl(lowTrades)];
   const winRates = [getWinRate(highTrades), getWinRate(medTrades), getWinRate(lowTrades)];
   const counts = [highTrades.length, medTrades.length, lowTrades.length];
+  console.debug("[Adherence] trades in:", trades.length, "high/med/low:", counts, "avgPnls:", avgPnls, "winRates:", winRates);
 
   function getAvgPnl(arr) {
     if (arr.length === 0) return 0;
