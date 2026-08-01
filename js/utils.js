@@ -315,6 +315,15 @@ export function getDateRange(preset, baseDate = new Date()) {
   return { start, end };
 }
 
+export function excelSerialToDate(serial) {
+  if (typeof serial !== "number" || isNaN(serial) || serial <= 0) return null;
+  const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+  const days = Math.floor(serial);
+  const fraction = serial - days;
+  const millisecondsInDay = 86400000;
+  return new Date(excelEpoch.getTime() + days * millisecondsInDay + Math.round(fraction * millisecondsInDay));
+}
+
 export function normalizeDateTime(dateVal) {
   if (dateVal === null || dateVal === undefined || dateVal === "") return "";
   
@@ -325,16 +334,16 @@ export function normalizeDateTime(dateVal) {
     if (dateVal > 10000000000) {
       d = new Date(dateVal < 1000000000000 ? dateVal * 1000 : dateVal);
     } else {
-      d = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
+      d = excelSerialToDate(dateVal);
     }
   } else {
     const str = String(dateVal).trim();
     const num = Number(str);
-    if (str && !isNaN(num)) {
+    if (str && !isNaN(num) && num > 1000) {
       if (num > 10000000000) {
         d = new Date(num < 1000000000000 ? num * 1000 : num);
       } else {
-        d = new Date(Math.round((num - 25569) * 86400 * 1000));
+        d = excelSerialToDate(num);
       }
     } else {
       const match = str.match(/^(\d{4})[-/](\d{2})[-/](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
