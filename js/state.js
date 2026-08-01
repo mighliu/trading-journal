@@ -244,7 +244,7 @@ class StateManager {
     if (!this.db) return;
     
     try {
-      // Load Settings
+      // 1. Load Settings from SQLite & sync with localStorage
       const stmtSet = this.db.prepare("SELECT value FROM settings WHERE key = 'app_settings'");
       if (stmtSet.step()) {
         const row = stmtSet.getAsObject();
@@ -256,6 +256,15 @@ class StateManager {
       }
       stmtSet.free();
 
+      // Check localStorage for any newer settings overrides
+      const storedSettings = localStorage.getItem("tf_settings");
+      if (storedSettings) {
+        try {
+          const lsSet = JSON.parse(storedSettings);
+          this.settings = { ...this.settings, ...lsSet };
+        } catch (e) {}
+      }
+
       if (!this.settings.accounts) {
         const oldBal = this.settings.startingBalance || 25000;
         const oldFees = this.settings.defaultFees || 0;
@@ -266,7 +275,7 @@ class StateManager {
         this.settings.currentAccount = "Personal";
       }
 
-      // Load Trades
+      // 2. Load Trades from SQLite
       const stmtTrades = this.db.prepare("SELECT * FROM trades ORDER BY exit_date_time DESC");
       const loadedTrades = [];
       while (stmtTrades.step()) {
@@ -295,13 +304,13 @@ class StateManager {
           executionScore: r.execution_score || "A",
           signalEntryPrice: r.signal_entry_price,
           signalExitPrice: r.signal_exit_price,
-          accountId: r.account_id,
-          mistake: r.mistake,
-          assetClass: r.asset_class,
-          status: r.status,
+          accountId: r.account_id || "Personal",
+          mistake: r.mistake || "",
+          assetClass: r.asset_class || "stocks",
+          status: r.status || "executed",
           overridePnl: r.override_pnl === 1,
           manualPnl: r.manual_pnl,
-          interventionType: r.intervention_type,
+          interventionType: r.intervention_type || "followed",
           maxPrice: r.max_price,
           minPrice: r.min_price,
           mfe: r.mfe,
@@ -311,12 +320,31 @@ class StateManager {
         });
       }
       stmtTrades.free();
-      if (loadedTrades.length > 0) {
-        this.trades = loadedTrades;
-        console.log(`Loaded ${loadedTrades.length} trades from SQLite WASM database.`);
-      } else {
-        this.loadFromStorage();
+
+      // 3. Merge with localStorage trades to ensure zero data loss
+      let lsTrades = [];
+      const storedTrades = localStorage.getItem("tf_trades");
+      if (storedTrades) {
+        try {
+          lsTrades = JSON.parse(storedTrades) || [];
+        } catch (e) {}
       }
+
+      // Combine loadedTrades and lsTrades, avoiding duplicates
+      const mergedMap = new Map();
+      loadedTrades.forEach(t => mergedMap.set(t.id, t));
+      lsTrades.forEach(t => {
+        if (t && t.id && !mergedMap.has(t.id)) {
+          mergedMap.set(t.id, t);
+          this.insertTradeSql(t); // re-sync missing trade back to SQLite
+        }
+      });
+
+      this.trades = Array.from(mergedMap.values()).sort((a, b) => {
+        return new Date(b.exitDateTime) - new Date(a.exitDateTime);
+      });
+
+      console.log(`Successfully synchronized ${this.trades.length} trades across SQLite WASM and localStorage.`);
     } catch (err) {
       console.error("loadFromSqlite error:", err);
       this.loadFromStorage();
