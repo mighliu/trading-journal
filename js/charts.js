@@ -2740,17 +2740,22 @@ export function renderRollingPerformanceChart(trades) {
   const windowSize = Math.min(20, Math.floor(sorted.length / 2) || 5);
   const labels = [];
   const winRates = [];
-  const profitFactors = [];
+  const rawProfitFactors = [];
+  const plotProfitFactors = [];
+  const windowBreakdowns = [];
 
   for (let i = windowSize - 1; i < sorted.length; i++) {
     const windowTrades = sorted.slice(i - windowSize + 1, i + 1);
     const wins = windowTrades.filter(t => calcNetPnl(t) > 0).length;
+    const losses = windowTrades.filter(t => calcNetPnl(t) < 0).length;
     const wr = (wins / windowSize) * 100;
     const pf = calcProfitFactor(windowTrades);
 
     labels.push(`T${i + 1}`);
     winRates.push(wr);
-    profitFactors.push(pf === 99.9 ? 5.0 : pf);
+    rawProfitFactors.push(pf);
+    plotProfitFactors.push(pf === 99.9 ? 10.0 : Math.min(10.0, parseFloat(pf.toFixed(2))));
+    windowBreakdowns.push({ wins, losses, count: windowTrades.length });
   }
 
   const ctx = canvas.getContext("2d");
@@ -2773,13 +2778,13 @@ export function renderRollingPerformanceChart(trades) {
         },
         {
           label: `Rolling ${windowSize}-Trade Profit Factor`,
-          data: profitFactors,
+          data: plotProfitFactors,
           borderColor: "#eab308",
           backgroundColor: "transparent",
           borderWidth: 2,
           yAxisID: "yProfitFactor",
           tension: 0.3,
-          pointRadius: profitFactors.length > 50 ? 1 : 4,
+          pointRadius: plotProfitFactors.length > 50 ? 1 : 4,
           pointHoverRadius: 7,
           pointHitRadius: 10
         }
@@ -2796,6 +2801,24 @@ export function renderRollingPerformanceChart(trades) {
         legend: {
           display: true,
           labels: { color: "#a1a1aa", font: { family: "Inter" } }
+        },
+        tooltip: {
+          backgroundColor: getTooltipBg(),
+          callbacks: {
+            label: function(context) {
+              const idx = context.dataIndex;
+              const rawPf = rawProfitFactors[idx];
+              const wr = winRates[idx];
+              const b = windowBreakdowns[idx];
+
+              if (context.datasetIndex === 0) {
+                return `Win Rate: ${wr.toFixed(1)}% (${b.wins}W / ${b.losses}L in window)`;
+              } else {
+                const pfStr = rawPf === 99.9 ? "∞ (0 losses)" : rawPf.toFixed(2);
+                return `Profit Factor: ${pfStr}${rawPf > 10 ? ' (scaled to 10 on chart)' : ''}`;
+              }
+            }
+          }
         }
       },
       scales: {
@@ -2816,10 +2839,13 @@ export function renderRollingPerformanceChart(trades) {
           type: "linear",
           position: "right",
           title: { display: true, text: "Profit Factor", color: "#eab308" },
-          ticks: { color: getTickColor() },
+          ticks: { 
+            color: getTickColor(),
+            callback: (val) => val >= 10 ? "10+" : val
+          },
           grid: { display: false },
           min: 0,
-          max: 5
+          max: 10
         }
       }
     }
