@@ -774,25 +774,32 @@ export function calcMfe(trade) {
   const mult = getEffectiveMultiplier(trade);
   const dir = String(trade.direction || "long").toLowerCase();
 
-  // Determine peak price/excursion value from trade fields
-  let val = trade.mfe != null ? parseFloat(trade.mfe) : (dir === "long" ? parseFloat(trade.maxPrice) : parseFloat(trade.minPrice));
-
-  if (val == null || isNaN(val)) {
-    return Math.max(0, dir === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult);
-  }
-
-  // Case A: val is a price level (e.g. 50,558.50 for entry 50,402.50 or 185.00 for entry 180.00)
-  if (entry > 0 && val > entry * 0.1) {
-    if (val > entry * 3) {
-      // Out of bounds / shifted cumulative column error from import
-      return Math.max(0, dir === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult);
+  // 1. Direct dollar MFE (e.g. from imported TradingView Favorable Excursion)
+  if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
+    const rawMfe = Math.abs(parseFloat(trade.mfe));
+    // Check if rawMfe is actually an asset price level (e.g. 50,558.50 for entry 50,402.50)
+    if (entry > 0 && rawMfe > entry * 0.1 && rawMfe < entry * 3) {
+      const excursionPoints = dir === "long" ? Math.max(0, rawMfe - entry) : Math.max(0, entry - rawMfe);
+      return excursionPoints * qty * mult;
     }
-    const excursionPoints = dir === "long" ? Math.max(0, val - entry) : Math.max(0, entry - val);
-    return excursionPoints * qty * mult;
+    return rawMfe;
   }
 
-  // Case B: val is already a dollar excursion amount
-  return Math.max(0, val);
+  // 2. Compute from maxPrice / minPrice
+  if (dir === "long") {
+    if (trade.maxPrice == null) return Math.max(0, (exit - entry) * qty * mult);
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return Math.max(0, (exit - entry) * qty * mult);
+    const maxVal = Math.max(rawMax, entry, exit);
+    return Math.max(0, (maxVal - entry) * qty * mult);
+  } else {
+    // Short trade: MFE is peak price drop below entry (entry - minPrice)
+    if (trade.minPrice == null) return Math.max(0, (entry - exit) * qty * mult);
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin) || rawMin === 0) return Math.max(0, (entry - exit) * qty * mult);
+    const minVal = Math.min(rawMin, entry, exit);
+    return Math.max(0, (entry - minVal) * qty * mult);
+  }
 }
 
 export function calcMae(trade) {
@@ -807,23 +814,33 @@ export function calcMae(trade) {
   const mult = getEffectiveMultiplier(trade);
   const dir = String(trade.direction || "long").toLowerCase();
 
-  let val = trade.mae != null ? parseFloat(trade.mae) : (dir === "long" ? parseFloat(trade.minPrice) : parseFloat(trade.maxPrice));
-
-  if (val == null || isNaN(val)) {
-    return Math.max(0, dir === "long" ? (entry - exit) * qty * mult : (exit - entry) * qty * mult);
-  }
-
-  // Case A: val is a price level (e.g. 50,384.00 for entry 50,402.50 or 179.00 for entry 180.00)
-  if (entry > 0 && val > entry * 0.1) {
-    if (val > entry * 3) {
-      return Math.max(0, dir === "long" ? (entry - exit) * qty * mult : (exit - entry) * qty * mult);
+  // 1. Direct dollar MAE (e.g. from imported TradingView Adverse Excursion)
+  if (trade.mae != null && !isNaN(parseFloat(trade.mae))) {
+    const rawMae = Math.abs(parseFloat(trade.mae));
+    // Check if rawMae is actually an asset price level (e.g. 50,384.00 for entry 50,402.50)
+    if (entry > 0 && rawMae > entry * 0.1 && rawMae < entry * 3) {
+      const excursionPoints = dir === "long" ? Math.max(0, entry - rawMae) : Math.max(0, rawMae - entry);
+      return excursionPoints * qty * mult;
     }
-    const excursionPoints = dir === "long" ? Math.max(0, entry - val) : Math.max(0, val - entry);
-    return excursionPoints * qty * mult;
+    return rawMae;
   }
 
-  // Case B: val is already a dollar excursion amount
-  return Math.max(0, Math.abs(val));
+  // 2. Compute from minPrice / maxPrice
+  if (dir === "long") {
+    // Long trade: MAE is peak price drop below entry (entry - minPrice)
+    if (trade.minPrice == null) return Math.max(0, (entry - exit) * qty * mult);
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin)) return Math.max(0, (entry - exit) * qty * mult);
+    const minVal = Math.min(rawMin, entry, exit);
+    return Math.max(0, (entry - minVal) * qty * mult);
+  } else {
+    // Short trade: MAE is peak price rise above entry (maxPrice - entry)
+    if (trade.maxPrice == null) return Math.max(0, (exit - entry) * qty * mult);
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return Math.max(0, (exit - entry) * qty * mult);
+    const maxVal = Math.max(rawMax, entry, exit);
+    return Math.max(0, (maxVal - entry) * qty * mult);
+  }
 }
 
 export function isRevengeTrade(trade, allTrades) {
