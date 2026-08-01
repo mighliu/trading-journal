@@ -705,7 +705,7 @@ class StateManager {
     let list = [...this.trades];
 
     const activeAccount = this.settings.currentAccount || "Personal";
-    list = list.filter(t => (t.accountId || "Personal") === activeAccount);
+    list = list.filter(t => String(t.accountId || "Personal").toLowerCase().trim() === activeAccount.toLowerCase().trim());
 
     const baseDate = new Date();
     let startLimit = null;
@@ -733,32 +733,40 @@ class StateManager {
 
     if (this.activeFilters.symbol) {
       const query = this.activeFilters.symbol.toUpperCase().trim();
-      list = list.filter(t => t.symbol.toUpperCase().includes(query));
+      list = list.filter(t => String(t.symbol || "").toUpperCase().includes(query));
     }
 
-    if (this.activeFilters.direction !== "all") {
-      list = list.filter(t => t.direction === this.activeFilters.direction);
+    if (this.activeFilters.direction && this.activeFilters.direction !== "all") {
+      const targetDir = this.activeFilters.direction.toLowerCase().trim();
+      list = list.filter(t => {
+        const d = String(t.direction || "long").toLowerCase().trim();
+        if (targetDir === "long") return d === "long" || d === "buy";
+        if (targetDir === "short") return d === "short" || d === "sell";
+        return d === targetDir;
+      });
     }
 
-    if (this.activeFilters.outcome !== "all") {
+    if (this.activeFilters.outcome && this.activeFilters.outcome !== "all") {
       list = list.filter(t => {
         const netPnl = calcNetPnl(t);
         if (this.activeFilters.outcome === "win") return netPnl > 0;
         if (this.activeFilters.outcome === "loss") return netPnl < 0;
-        if (this.activeFilters.outcome === "breakeven") return netPnl === 0;
+        if (this.activeFilters.outcome === "breakeven") return Math.abs(netPnl) < 0.001;
         return true;
       });
     }
 
-    if (this.activeFilters.setup !== "all") {
+    if (this.activeFilters.setup && this.activeFilters.setup !== "all") {
+      const targetSetup = this.activeFilters.setup.toLowerCase().trim();
       list = list.filter(t => {
-        const tags = (t.setup || "").split(",").map(s => s.trim().toLowerCase());
-        return tags.includes(this.activeFilters.setup.toLowerCase());
+        const tags = String(t.setup || "").toLowerCase().split(",").map(s => s.trim());
+        return tags.some(tag => tag === targetSetup || tag.includes(targetSetup));
       });
     }
 
     if (this.activeFilters.assetClass && this.activeFilters.assetClass !== "all") {
-      list = list.filter(t => t.assetClass === this.activeFilters.assetClass);
+      const targetAsset = this.activeFilters.assetClass.toLowerCase().trim();
+      list = list.filter(t => String(t.assetClass || "stocks").toLowerCase().trim() === targetAsset);
     }
 
     if (this.activeFilters.status && this.activeFilters.status !== "all") {
