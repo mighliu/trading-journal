@@ -552,6 +552,7 @@ class StateManager {
     }
     this.trades.unshift(trade);
     this.saveToStorage();
+    this.notify();
     return trade;
   }
 
@@ -596,6 +597,7 @@ class StateManager {
     }
     this.trades[idx] = updated;
     this.saveToStorage();
+    this.notify();
     return this.trades[idx];
   }
 
