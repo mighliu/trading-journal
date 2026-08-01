@@ -1449,8 +1449,10 @@ class StateManager {
           overridePnl: manualPnl != null,
           manualPnl: manualPnl,
           interventionType: "followed",
-          maxPrice: mfeVal,
-          minPrice: maeVal
+          maxPrice: null,
+          minPrice: null,
+          mfe: mfeVal,
+          mae: maeVal
         });
       }
     } else {
