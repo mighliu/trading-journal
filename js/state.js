@@ -543,6 +543,37 @@ class StateManager {
     this.saveToStorage();
   }
 
+  addAccount(name, startingBalance = 25000, defaultFees = 0) {
+    const accName = (name || "").trim();
+    if (!accName) throw new Error("Account name cannot be empty.");
+    if (accName === "__ADD_NEW__") throw new Error("Reserved account name.");
+    
+    if (!this.settings.accounts) {
+      this.settings.accounts = {};
+    }
+    
+    if (this.settings.accounts[accName]) {
+      throw new Error(`An account named '${accName}' already exists.`);
+    }
+
+    this.settings.accounts[accName] = {
+      startingBalance: parseFloat(startingBalance) || 25000,
+      defaultFees: parseFloat(defaultFees) || 0
+    };
+
+    // Switch to new account
+    this.settings.currentAccount = accName;
+    this.settings.startingBalance = parseFloat(startingBalance) || 25000;
+    this.settings.defaultFees = parseFloat(defaultFees) || 0;
+
+    this.saveToStorage();
+  }
+
+  setFilters(filters) {
+    this.activeFilters = { ...this.activeFilters, ...filters };
+    this.notify();
+  }
+
   seedDemoData(demoTrades) {
     if (this.db) {
       this.db.run("DELETE FROM trades");
