@@ -3134,9 +3134,25 @@ export function renderTimelineReplayChart(trades) {
     return;
   }
 
-  const dayTrades = executedTrades.filter(t => 
+  const rawDayTrades = executedTrades.filter(t => 
     getLocalDateStr(t.entryDateTime) === selectedDate
   ).sort((a, b) => new Date(a.entryDateTime) - new Date(b.entryDateTime));
+
+  // Deduplicate identical trades by ID or composite fingerprint
+  const seenFps = new Set();
+  const dayTrades = [];
+  rawDayTrades.forEach(t => {
+    const entryTs = new Date(t.entryDateTime).getTime();
+    const exitTs = new Date(t.exitDateTime).getTime();
+    const idFp = t.id ? t.id : null;
+    const compFp = `${t.symbol}_${t.direction}_${Math.round(entryTs / 1000)}_${Math.round(exitTs / 1000)}_${t.entryPrice}_${t.exitPrice}_${t.qty}_${t.accountId || "Personal"}`;
+
+    if ((!idFp || !seenFps.has(idFp)) && !seenFps.has(compFp)) {
+      if (idFp) seenFps.add(idFp);
+      seenFps.add(compFp);
+      dayTrades.push(t);
+    }
+  });
 
   if (dayTrades.length === 0) {
     renderEmptyChartMessage(canvasId, `No trades executed on ${selectedDate}`);

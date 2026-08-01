@@ -376,6 +376,44 @@ class StateManager {
   sanitizeLoadedTrades() {
     if (!Array.isArray(this.trades) || this.trades.length === 0) return;
 
+    // Deduplicate loaded trades by ID and composite fingerprint
+    const seenIds = new Set();
+    const seenFingerprints = new Set();
+    const uniqueTrades = [];
+    let dupsRemoved = 0;
+
+    this.trades.forEach(t => {
+      if (!t) return;
+      const entryTs = t.entryDateTime ? new Date(t.entryDateTime).getTime() : 0;
+      const exitTs = t.exitDateTime ? new Date(t.exitDateTime).getTime() : entryTs;
+      const idStr = t.id || null;
+      const fp = `${t.symbol}_${t.direction}_${Math.round(entryTs / 1000)}_${Math.round(exitTs / 1000)}_${t.entryPrice}_${t.exitPrice}_${t.qty}_${t.accountId || "Personal"}`;
+
+      if (idStr && seenIds.has(idStr)) {
+        dupsRemoved++;
+        if (this.db && t.id) {
+          try { this.db.run("DELETE FROM trades WHERE id = ?", [t.id]); } catch(e) {}
+        }
+        return;
+      }
+      if (seenFingerprints.has(fp)) {
+        dupsRemoved++;
+        if (this.db && t.id) {
+          try { this.db.run("DELETE FROM trades WHERE id = ?", [t.id]); } catch(e) {}
+        }
+        return;
+      }
+
+      if (idStr) seenIds.add(idStr);
+      seenFingerprints.add(fp);
+      uniqueTrades.push(t);
+    });
+
+    if (dupsRemoved > 0) {
+      console.log(`Deduplicated ${dupsRemoved} duplicate trades on startup.`);
+      this.trades = uniqueTrades;
+    }
+
     let fixedCount = 0;
     this.trades.forEach(t => {
       let modified = false;
