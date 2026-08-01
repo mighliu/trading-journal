@@ -53,9 +53,9 @@ const calendarToday = new Date("2026-06-29T17:34:00"); // Base date context
 let calendarYear = calendarToday.getFullYear();
 let calendarMonth = calendarToday.getMonth();
 
-function init() {
-  // 1. Load data
-  AppState.loadFromStorage();
+async function init() {
+  // 1. Initialize SQLite WASM database
+  await AppState.initDatabase();
 
   // Populate dynamic accounts list
   populateAccountSelector();
@@ -244,6 +244,7 @@ function setupActionButtons() {
   // Export buttons
   const exportJsonBtn = document.getElementById("exportJsonBtn");
   const exportCsvBtn = document.getElementById("exportCsvBtn");
+  const exportSqliteBtn = document.getElementById("exportSqliteBtn");
   
   if (exportJsonBtn) {
     exportJsonBtn.addEventListener("click", () => {
@@ -255,6 +256,12 @@ function setupActionButtons() {
     exportCsvBtn.addEventListener("click", () => {
       AppState.exportCSV();
       showToast("Data exported as CSV file.", "success");
+    });
+  }
+  if (exportSqliteBtn) {
+    exportSqliteBtn.addEventListener("click", () => {
+      AppState.exportSQLite();
+      showToast("Database exported as SQLite file.", "success");
     });
   }
 
