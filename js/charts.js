@@ -12,7 +12,10 @@ import {
   calcPostLossPerformance,
   calcProfitFactor,
   formatCurrency,
-  calcFatiguePivotData
+  calcFatiguePivotData,
+  isExecutedTrade,
+  isSkippedTrade,
+  runMonteCarloSimulation
 } from './utils.js';
 import { AppState } from './state.js';
 
@@ -146,7 +149,7 @@ export function renderEquityCurve(trades, startingBalance = 25000) {
   if (!canvas) return;
 
   // Sort trades by exit datetime ascending
-  const sortedTrades = [...trades].filter(t => t.status !== "skipped").sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+  const sortedTrades = [...trades].filter(t => !isSkippedTrade(t)).sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   let runningPnl = 0;
   let peak = 0;
@@ -592,7 +595,7 @@ export function renderDailyPnlChart(trades) {
   // Group P&L by Date (YYYY-MM-DD)
   const dailyData = {};
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     const dateStr = trade.exitDateTime.split("T")[0];
     const pnl = calcNetPnl(trade);
     dailyData[dateStr] = (dailyData[dateStr] || 0) + pnl;
@@ -683,7 +686,7 @@ export function renderDayOfWeekChart(trades) {
   ];
 
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     const exitDate = new Date(trade.exitDateTime);
     let dayIdx = exitDate.getDay() - 1; // 0 = Monday, 4 = Friday
     // Map Sunday/Saturday to closest week days if they occur (crypto swing trades exit on weekends)
@@ -767,7 +770,7 @@ export function renderSetupTagChart(trades) {
 
   const setupStats = {};
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     const setup = trade.setup || "No Tag";
     if (!setupStats[setup]) {
       setupStats[setup] = { pnl: 0, count: 0, wins: 0 };
@@ -855,7 +858,7 @@ export function renderSymbolChart(trades) {
   // Group by symbol to calculate count, win rate, and total pnl
   const symbolStats = {};
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     const sym = trade.symbol;
     if (!symbolStats[sym]) {
       symbolStats[sym] = { trades: [], pnl: 0 };
@@ -967,7 +970,7 @@ export function renderDistributionChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const pnls = trades.filter(t => t.status !== "skipped").map(t => getTradePnl(t));
+  const pnls = trades.filter(t => !isSkippedTrade(t)).map(t => getTradePnl(t));
   if (pnls.length === 0) return;
 
   // Let's create bin ranges (e.g. $100 buckets or automated)
@@ -1079,7 +1082,7 @@ export function renderMistakeChart(trades) {
 
   const mistakeStats = {};
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     const mistake = trade.mistake || "Disciplined";
     if (!mistakeStats[mistake]) {
       mistakeStats[mistake] = { pnl: 0, count: 0 };
@@ -1163,7 +1166,7 @@ export function renderSlippageSymbolChart(trades) {
 
   const symbolSlippage = {};
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     if (trade.signalEntryPrice != null || trade.signalExitPrice != null) {
       const actPnl = calcNetPnl(trade);
       const sigPnl = calcSignalPnl(trade);
@@ -1251,7 +1254,7 @@ export function renderHourPnlChart(trades) {
 
   const hourStats = {};
   for (const t of trades) {
-    if (t.status === "skipped") continue;
+    if (isSkippedTrade(t)) continue;
     if (!t.entryDateTime) continue;
     const dateObj = new Date(t.entryDateTime);
     if (isNaN(dateObj.getTime())) continue;
@@ -1354,7 +1357,7 @@ export function renderCumulativeSlippageChart(trades) {
 
   // Filter trades that have at least one signal parameter defined
   const sigTrades = trades
-    .filter(t => t.status !== "skipped" && (t.signalEntryPrice != null || t.signalExitPrice != null))
+    .filter(t => !isSkippedTrade(t) && (t.signalEntryPrice != null || t.signalExitPrice != null))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sigTrades.length === 0) {
@@ -1400,12 +1403,12 @@ export function renderCumulativeSlippageChart(trades) {
       datasets: [{
         label: "Cumulative Slippage",
         data: dataPoints,
-        borderColor: "var(--accent)",
+        borderColor: getAccentColor(),
         borderWidth: 2,
         fill: true,
         backgroundColor: gradient,
         tension: 0.2,
-        pointBackgroundColor: "var(--accent)",
+        pointBackgroundColor: getAccentColor(),
         pointRadius: dataPoints.length < 15 ? 4 : 2
       }]
     },
@@ -1462,7 +1465,7 @@ export function renderAssetClassChart(trades) {
   };
 
   for (const trade of trades) {
-    if (trade.status === "skipped") continue;
+    if (isSkippedTrade(trade)) continue;
     const rawClass = trade.assetClass || "stocks";
     // Capitalize correctly for display labels
     const formattedClass = rawClass.charAt(0).toUpperCase() + rawClass.slice(1);
@@ -1603,7 +1606,7 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
   for (const t of sortedTrades) {
     currentActual += calcNetPnl(t);
     
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       if (t.signalEntryPrice != null && t.signalExitPrice != null) {
         currentStrategy += calcSignalPnl(t);
       }
@@ -1743,7 +1746,7 @@ export function renderInterventionAttributionChart(trades) {
       const sig = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : act;
       
       let delta = 0;
-      if (t.status === "skipped") {
+      if (isSkippedTrade(t)) {
         delta = 0 - sig;
       } else {
         delta = act - sig;
@@ -1835,7 +1838,7 @@ export function renderInterventionHourlyChart(trades) {
     const sig = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : act;
     
     let delta = 0;
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       delta = 0 - sig;
     } else {
       delta = act - sig;
@@ -1935,7 +1938,7 @@ export function renderInterventionStreakChart(trades) {
     const sig = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : act;
     
     let delta = 0;
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       delta = 0 - sig;
     } else {
       delta = act - sig;
@@ -1953,7 +1956,7 @@ export function renderInterventionStreakChart(trades) {
       buckets.loss2.total += delta;
     }
 
-    if (t.status === "executed") {
+    if (isExecutedTrade(t)) {
       if (act > 0) {
         currentStreak = currentStreak >= 0 ? currentStreak + 1 : 1;
       } else if (act < 0) {
@@ -2183,7 +2186,7 @@ export function renderHoldTimeChart(trades) {
   ];
 
   for (const t of trades) {
-    if (t.status === "skipped") continue;
+    if (isSkippedTrade(t)) continue;
     const duration = calcDuration(t.entryDateTime, t.exitDateTime);
     if (!duration) continue;
 
@@ -2313,7 +2316,7 @@ export function renderMfeMaeCharts(trades) {
   // Sort executed trades globally to ensure trade number consistency
   const currentAccount = AppState.settings.currentAccount || "Personal";
   const allExecuted = AppState.trades
-    .filter(x => x.accountId === currentAccount && x.status === "executed")
+    .filter(x => x.accountId === currentAccount && isExecutedTrade(x))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   // 1. MFE Scatter
@@ -2323,7 +2326,7 @@ export function renderMfeMaeCharts(trades) {
   if (mfeCanvas) {
     const dataPoints = [];
     trades.forEach(t => {
-      if (t.status === "skipped") return;
+      if (isSkippedTrade(t)) return;
       const mfe = calcMfe(t);
       const pnl = calcNetPnl(t);
       if (mfe !== null && !isNaN(mfe)) {
@@ -2415,7 +2418,7 @@ export function renderMfeMaeCharts(trades) {
   if (maeCanvas) {
     const dataPoints = [];
     trades.forEach(t => {
-      if (t.status === "skipped") return;
+      if (isSkippedTrade(t)) return;
       const mae = calcMae(t);
       const pnl = calcNetPnl(t);
       if (mae !== null && !isNaN(mae)) {
@@ -2514,7 +2517,7 @@ export function renderRMultipleChart(trades) {
   const rBest = document.getElementById("rBest");
   const rWorst = document.getElementById("rWorst");
 
-  const executedLosingTrades = trades.filter(t => t.status === "executed" && calcNetPnl(t) < 0);
+  const executedLosingTrades = trades.filter(t => isExecutedTrade(t) && calcNetPnl(t) < 0);
   const avgLoss = executedLosingTrades.length > 0 
     ? executedLosingTrades.reduce((sum, t) => sum + Math.abs(calcNetPnl(t)), 0) / executedLosingTrades.length 
     : 100;
@@ -2534,7 +2537,7 @@ export function renderRMultipleChart(trades) {
   ];
 
   trades.forEach(t => {
-    if (t.status === "skipped") return;
+    if (isSkippedTrade(t)) return;
     const rMult = calcRiskReward(t, avgLoss);
     if (rMult === null || isNaN(rMult)) return;
 
@@ -2574,7 +2577,7 @@ export function renderRMultipleChart(trades) {
   // Render stats to DOM elements
   if (rExpectancy) {
     rExpectancy.textContent = `${expectancy >= 0 ? "+" : ""}${expectancy.toFixed(2)}R`;
-    rExpectancy.style.color = expectancy >= 0 ? "var(--profit)" : "var(--loss)";
+    rExpectancy.style.color = expectancy >= 0 ? getProfitColor() : getLossColor();
   }
   if (rAvgWin) rAvgWin.textContent = `+${avgWinR.toFixed(2)}R`;
   if (rAvgLoss) rAvgLoss.textContent = `${avgLossR.toFixed(2)}R`;
@@ -2726,7 +2729,7 @@ export function renderRollingPerformanceChart(trades) {
   if (!canvas) return;
 
   const sorted = [...trades]
-    .filter(t => t.status === "executed")
+    .filter(t => isExecutedTrade(t))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sorted.length < 5) {
@@ -2759,7 +2762,7 @@ export function renderRollingPerformanceChart(trades) {
         {
           label: `Rolling ${windowSize}-Trade Win Rate (%)`,
           data: winRates,
-          borderColor: "var(--accent)",
+          borderColor: getAccentColor(),
           backgroundColor: "rgba(99, 102, 241, 0.05)",
           borderWidth: 2,
           yAxisID: "yWinRate",
@@ -2803,7 +2806,7 @@ export function renderRollingPerformanceChart(trades) {
         yWinRate: {
           type: "linear",
           position: "left",
-          title: { display: true, text: "Win Rate (%)", color: "var(--accent)" },
+          title: { display: true, text: "Win Rate (%)", color: getAccentColor() },
           ticks: { color: getTickColor() },
           grid: { color: getGridColor() },
           min: 0,
@@ -2839,7 +2842,7 @@ export function renderTradeSequenceChart(trades) {
   ];
 
   trades.forEach(t => {
-    if (t.status === "skipped") return;
+    if (isSkippedTrade(t)) return;
     const seq = sequenceMap[t.id];
     if (!seq) return;
 
@@ -2979,7 +2982,7 @@ export function renderPostLossBehaviorChart(trades) {
           label: "Win Rate (%)",
           data: winRates,
           backgroundColor: "rgba(99, 102, 241, 0.6)",
-          borderColor: "var(--accent)",
+          borderColor: getAccentColor(),
           borderWidth: 1.5,
           yAxisID: "yWR",
           borderRadius: 6
@@ -2988,7 +2991,7 @@ export function renderPostLossBehaviorChart(trades) {
           label: "Avg P&L ($)",
           data: avgPnls,
           backgroundColor: avgPnls.map(v => v >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
-          borderColor: avgPnls.map(v => v >= 0 ? "var(--profit)" : "var(--loss)"),
+          borderColor: avgPnls.map(v => v >= 0 ? getProfitColor() : getLossColor()),
           borderWidth: 1.5,
           yAxisID: "yPnl",
           borderRadius: 6
@@ -3030,7 +3033,7 @@ export function renderPostLossBehaviorChart(trades) {
         yWR: {
           type: "linear",
           position: "left",
-          title: { display: true, text: "Win Rate (%)", color: "var(--accent)" },
+          title: { display: true, text: "Win Rate (%)", color: getAccentColor() },
           ticks: { color: getTickColor() },
           grid: { color: getGridColor() },
           min: 0,
@@ -3039,7 +3042,7 @@ export function renderPostLossBehaviorChart(trades) {
         yPnl: {
           type: "linear",
           position: "right",
-          title: { display: true, text: "Avg P&L ($)", color: "var(--profit)" },
+          title: { display: true, text: "Avg P&L ($)", color: getProfitColor() },
           ticks: { color: getTickColor() },
           grid: { display: false }
         }
@@ -3056,7 +3059,7 @@ export function renderTimelineReplayChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const executedTrades = trades.filter(t => t.status === "executed");
+  const executedTrades = trades.filter(t => isExecutedTrade(t));
   if (executedTrades.length === 0) {
     renderEmptyChartMessage(canvasId, "No executed trades available for timeline replay.");
     return;
@@ -3140,7 +3143,7 @@ export function renderTimelineReplayChart(trades) {
         label: "Hold Timeline",
         data: datasetsData,
         backgroundColor: dayTrades.map(t => calcNetPnl(t) >= 0 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)"),
-        borderColor: dayTrades.map(t => calcNetPnl(t) >= 0 ? "var(--profit)" : "var(--loss)"),
+        borderColor: dayTrades.map(t => calcNetPnl(t) >= 0 ? getProfitColor() : getLossColor()),
         borderWidth: 1.5,
         borderRadius: 4
       }]
@@ -3204,7 +3207,7 @@ export function renderAdherencePerformanceChart(trades) {
   const lowTrades = [];
 
   trades.forEach(t => {
-    if (t.status === "skipped") return;
+    if (isSkippedTrade(t)) return;
     const score = t.adherenceScore !== undefined && t.adherenceScore !== null ? t.adherenceScore : 100;
     if (score >= 80) {
       highTrades.push(t);
@@ -3251,9 +3254,9 @@ export function renderAdherencePerformanceChart(trades) {
             "rgba(239, 68, 68, 0.6)"   // Red for Low
           ],
           borderColor: [
-            "var(--profit)",
+            getProfitColor(),
             "rgba(234, 179, 8, 1.0)",
-            "var(--loss)"
+            getLossColor()
           ],
           borderWidth: 1.5,
           yAxisID: "yPnl"
@@ -3262,7 +3265,7 @@ export function renderAdherencePerformanceChart(trades) {
           type: "line",
           label: "Win Rate (%)",
           data: winRates,
-          borderColor: "var(--accent)",
+          borderColor: getAccentColor(),
           backgroundColor: "rgba(99, 102, 241, 0.1)",
           borderWidth: 2.5,
           tension: 0.2,
@@ -3313,7 +3316,7 @@ export function renderAdherencePerformanceChart(trades) {
         yWinRate: {
           type: "linear",
           position: "right",
-          title: { display: true, text: "Win Rate (%)", color: "var(--accent)" },
+          title: { display: true, text: "Win Rate (%)", color: getAccentColor() },
           ticks: { color: getTickColor() },
           grid: { display: false },
           min: 0,
@@ -3330,7 +3333,7 @@ export function renderDrawdownScatterChart(trades, startingBalance = 25000) {
   if (!canvas) return;
 
   const sorted = [...trades]
-    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .filter(t => isExecutedTrade(t))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sorted.length === 0) return;
@@ -3503,7 +3506,7 @@ export function renderHoldTimeScatterChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => isExecutedTrade(t));
 
   if (executed.length === 0) {
     renderEmptyChartMessage(canvasId, "No trade hold time data available");
@@ -3513,7 +3516,7 @@ export function renderHoldTimeScatterChart(trades) {
   // Sort executed trades globally to ensure trade number consistency
   const currentAccount = AppState.settings.currentAccount || "Personal";
   const allExecuted = AppState.trades
-    .filter(x => x.accountId === currentAccount && x.status === "executed")
+    .filter(x => x.accountId === currentAccount && isExecutedTrade(x))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   const dataPoints = [];

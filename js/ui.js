@@ -32,7 +32,9 @@ import {
   calcDrawdownContributions,
   calcHoldTimeDiagnostics,
   calcFatiguePivotData,
-  calcSetupMistakeMatrix
+  calcSetupMistakeMatrix,
+  isExecutedTrade,
+  isSkippedTrade
 } from './utils.js';
 import { renderMonteCarloChart } from './charts.js';
 
@@ -324,7 +326,7 @@ export function renderTradeLog(trades, page = 1) {
     return;
   }
 
-  const executedLosingTrades = filtered.filter(t => t.status === "executed" && calcNetPnl(t) < 0);
+  const executedLosingTrades = filtered.filter(t => isExecutedTrade(t) && calcNetPnl(t) < 0);
   const avgLoss = executedLosingTrades.length > 0 
     ? executedLosingTrades.reduce((sum, t) => sum + Math.abs(calcNetPnl(t)), 0) / executedLosingTrades.length 
     : 100;
@@ -370,7 +372,7 @@ export function renderTradeLog(trades, page = 1) {
     const durObj = calcDuration(t.entryDateTime, t.exitDateTime);
 
     const tr = document.createElement("tr");
-    tr.className = `trade-row-main${t.status === "skipped" ? " trade-row-skipped" : ""}`;
+    tr.className = `trade-row-main${isSkippedTrade(t) ? " trade-row-skipped" : ""}`;
     tr.dataset.id = t.id;
 
     const pnlClass = netPnl > 0 ? "profit" : netPnl < 0 ? "loss" : "breakeven";
@@ -383,7 +385,7 @@ export function renderTradeLog(trades, page = 1) {
     });
 
     let slippageIcon = "";
-    if (t.status !== "skipped") {
+    if (!isSkippedTrade(t)) {
       const hasSigEntry = t.signalEntryPrice !== null && t.signalEntryPrice !== undefined && t.signalEntryPrice !== "";
       const hasSigExit = t.signalExitPrice !== null && t.signalExitPrice !== undefined && t.signalExitPrice !== "";
       if (hasSigEntry || hasSigExit) {
@@ -417,7 +419,7 @@ export function renderTradeLog(trades, page = 1) {
       <td><i data-lucide="chevron-right" class="row-expand-icon"></i></td>
       <td style="text-align: center; color: var(--text-secondary); font-size: 0.8125rem;">${tradeNumber}</td>
       <td>${dateFormatted}</td>
-      <td class="bold">${escapedSymbol}${t.status === "skipped" ? ' <span class="badge status-skipped">Skipped</span>' : ""}${slippageIcon}</td>
+      <td class="bold">${escapedSymbol}${isSkippedTrade(t) ? ' <span class="badge status-skipped">Skipped</span>' : ""}${slippageIcon}</td>
       <td><span class="badge direction-${t.direction}">${t.direction.toUpperCase()}</span></td>
       <td>${t.qty}</td>
       <td>$${t.entryPrice.toFixed(2)}</td>
@@ -454,7 +456,7 @@ export function renderTradeLog(trades, page = 1) {
     }
 
     let comparisonMarkup = "";
-    if (t.status !== "skipped" && (t.signalEntryPrice != null || t.signalExitPrice != null)) {
+    if (!isSkippedTrade(t) && (t.signalEntryPrice != null || t.signalExitPrice != null)) {
       const sigEntry = t.signalEntryPrice != null ? t.signalEntryPrice : t.entryPrice;
       const sigExit = t.signalExitPrice != null ? t.signalExitPrice : t.exitPrice;
       const actEntry = t.entryPrice;
@@ -710,7 +712,7 @@ export function openTradeModal(id = null) {
       
       const hasInt = trade.interventionType && trade.interventionType !== "followed";
       document.getElementById("tradeHasIntervention").checked = hasInt;
-      document.getElementById("tradeIntervention").value = hasInt ? trade.interventionType : (trade.status === "skipped" ? "skipped_invalid" : "early_profit");
+      document.getElementById("tradeIntervention").value = hasInt ? trade.interventionType : (isSkippedTrade(trade) ? "skipped_invalid" : "early_profit");
       
       if (trade.checklistItems) {
         document.getElementById("chkTrend").checked = !!trade.checklistItems.trend;
@@ -1345,7 +1347,7 @@ export function setupUIListeners() {
         showToast("Symbol is required.", "error");
         return;
       }
-      if (tradeData.status === "executed") {
+      if (isExecutedTrade(tradeData)) {
         if (!tradeData.overridePnl) {
           if (isNaN(tradeData.entryPrice) || tradeData.entryPrice <= 0) {
             showToast("Valid Entry Price is required.", "error");
@@ -1984,7 +1986,7 @@ export function renderRiskTab(trades) {
   const streakProb = calcStreakProbability(trades);
   
   // MFE exit efficiency calculations (across winning trades with MFE recorded)
-  const tradesWithMfe = trades.filter(t => t.status === "executed" && calcMfe(t) !== null);
+  const tradesWithMfe = trades.filter(t => isExecutedTrade(t) && calcMfe(t) !== null);
   const winningMfeTrades = tradesWithMfe.filter(t => calcNetPnl(t) > 0);
   const totalMfe = winningMfeTrades.reduce((sum, t) => sum + calcMfe(t), 0);
   const totalCaptured = winningMfeTrades.reduce((sum, t) => sum + calcNetPnl(t), 0);
@@ -1992,7 +1994,7 @@ export function renderRiskTab(trades) {
   const leftOnTable = totalMfe - totalCaptured;
 
   // MAE drawdown control calculations (across all trades with MAE recorded)
-  const tradesWithMae = trades.filter(t => t.status === "executed" && calcMae(t) !== null);
+  const tradesWithMae = trades.filter(t => isExecutedTrade(t) && calcMae(t) !== null);
   const totalMae = tradesWithMae.reduce((sum, t) => sum + calcMae(t), 0);
   const losingMaeTrades = tradesWithMae.filter(t => calcNetPnl(t) < 0);
   const totalRealizedLoss = losingMaeTrades.reduce((sum, t) => sum + Math.abs(calcNetPnl(t)), 0);
@@ -2055,7 +2057,7 @@ export function renderRiskTab(trades) {
   const calcBalance = document.getElementById("calcBalance");
   if (calcBalance && !calcBalance.dataset.userModified) {
     const startingBalance = AppState.settings.startingBalance || 25000;
-    const executedTrades = trades.filter(t => t.status === "executed");
+    const executedTrades = trades.filter(t => isExecutedTrade(t));
     const cumulativeNetPnl = executedTrades.reduce((sum, t) => sum + calcNetPnl(t), 0);
     calcBalance.value = (startingBalance + cumulativeNetPnl).toFixed(2);
     

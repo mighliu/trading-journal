@@ -1572,3 +1572,16 @@ export function compressImage(file, maxWidth = 1000, quality = 0.8) {
     reader.readAsDataURL(file);
   });
 }
+
+
+export function isExecutedTrade(trade) {
+  if (!trade) return false;
+  const s = String(trade.status || "executed").toLowerCase().trim();
+  return s === "executed" || s === "closed" || s === "filled" || s === "taken" || s === "win" || s === "loss" || s === "";
+}
+
+export function isSkippedTrade(trade) {
+  if (!trade) return false;
+  const s = String(trade.status || "").toLowerCase().trim();
+  return s === "skipped" || s === "cancelled" || s === "canceled" || s === "rejected" || s === "invalid";
+}
