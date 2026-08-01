@@ -518,17 +518,7 @@ export function calcInterventionMetrics(trades) {
 
   for (const t of trades) {
     actualTotal += calcNetPnl(t);
-    if (isSkippedTrade(t)) {
-      if (t.signalEntryPrice != null && t.signalExitPrice != null) {
-        strategyTotal += calcSignalPnl(t);
-      }
-    } else {
-      if (t.signalEntryPrice != null && t.signalExitPrice != null) {
-        strategyTotal += calcSignalPnl(t);
-      } else {
-        strategyTotal += calcNetPnl(t);
-      }
-    }
+    strategyTotal += calcSignalPnl(t);
   }
 
   return {
@@ -554,7 +544,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
 
   for (const t of intervenedTrades) {
     const actPnl = calcNetPnl(t);
-    const sigPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : actPnl;
+    const sigPnl = calcSignalPnl(t);
     
     if (isSkippedTrade(t)) {
       if (sigPnl < 0) {
@@ -596,12 +586,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
       }
     }
 
-    let stratNet = 0;
-    if (isSkippedTrade(t)) {
-      stratNet = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : 0;
-    } else {
-      stratNet = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : actNet;
-    }
+    const stratNet = calcSignalPnl(t);
     strategyTotalPnl += stratNet;
     if (stratNet > 0) {
       strategyWins++;
@@ -628,12 +613,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   const actualSortino = calcSortinoRatio(trades.filter(t => isExecutedTrade(t)), startingBalance);
 
   const strategyTrades = trades.map(t => {
-    let stratPnl = 0;
-    if (isSkippedTrade(t)) {
-      stratPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : 0;
-    } else {
-      stratPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : calcNetPnl(t);
-    }
+    const stratPnl = calcSignalPnl(t);
     return {
       status: "executed",
       direction: "long",

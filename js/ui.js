@@ -1729,7 +1729,11 @@ export function populateAccountSelector() {
 }
 
 export function renderInterventionMatrix(trades) {
-  const analytics = calcInterventionAnalytics(trades, AppState.settings.startingBalance);
+  const currentAccount = AppState.settings.currentAccount || "Personal";
+  const startingBalance = typeof AppState.getStartingBalance === "function" 
+    ? AppState.getStartingBalance(currentAccount) 
+    : (AppState.settings.startingBalance || 25000);
+  const analytics = calcInterventionAnalytics(trades, startingBalance);
 
   // Update IER Gauge UI
   const ierValue = document.getElementById("ierGaugeValue");

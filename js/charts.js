@@ -1605,18 +1605,7 @@ export function renderInterventionChart(trades, startingBalance = 25000) {
 
   for (const t of sortedTrades) {
     currentActual += calcNetPnl(t);
-    
-    if (isSkippedTrade(t)) {
-      if (t.signalEntryPrice != null && t.signalExitPrice != null) {
-        currentStrategy += calcSignalPnl(t);
-      }
-    } else {
-      if (t.signalEntryPrice != null && t.signalExitPrice != null) {
-        currentStrategy += calcSignalPnl(t);
-      } else {
-        currentStrategy += calcNetPnl(t);
-      }
-    }
+    currentStrategy += calcSignalPnl(t);
 
     const dateStr = new Date(t.exitDateTime).toLocaleDateString("en-US", {
       month: "short",
@@ -1743,7 +1732,7 @@ export function renderInterventionAttributionChart(trades) {
     const type = t.interventionType;
     if (totals[type] !== undefined) {
       const act = calcNetPnl(t);
-      const sig = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : act;
+      const sig = calcSignalPnl(t);
       
       let delta = 0;
       if (isSkippedTrade(t)) {
@@ -1835,7 +1824,7 @@ export function renderInterventionHourlyChart(trades) {
     const hour = dateObj.getHours();
 
     const act = calcNetPnl(t);
-    const sig = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : act;
+    const sig = calcSignalPnl(t);
     
     let delta = 0;
     if (isSkippedTrade(t)) {
@@ -1935,7 +1924,7 @@ export function renderInterventionStreakChart(trades) {
 
   sorted.forEach(t => {
     const act = calcNetPnl(t);
-    const sig = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : act;
+    const sig = calcSignalPnl(t);
     
     let delta = 0;
     if (isSkippedTrade(t)) {
