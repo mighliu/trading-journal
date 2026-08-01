@@ -1292,23 +1292,27 @@ export function setupUIListeners() {
           }
         }
 
-        if (maxPriceVal !== null && !isNaN(maxPriceVal)) {
-          const maxVal = Math.max(maxPriceVal, entryPriceVal, exitPriceVal);
-          const diff = maxVal - entryPriceVal;
-          if (currentDirection === "long") {
-            mfe = diff * qtyVal * mult;
+        if (maxPriceVal !== null && !isNaN(maxPriceVal) && maxPriceVal > 0) {
+          if (entryPriceVal > 0 && maxPriceVal > entryPriceVal * 0.1 && maxPriceVal < entryPriceVal * 3) {
+            const maxVal = Math.max(maxPriceVal, entryPriceVal, exitPriceVal);
+            const diff = maxVal - entryPriceVal;
+            if (currentDirection === "long") mfe = diff * qtyVal * mult;
+            else mae = diff * qtyVal * mult;
           } else {
-            mae = diff * qtyVal * mult;
+            if (currentDirection === "long") mfe = maxPriceVal;
+            else mae = maxPriceVal;
           }
         }
 
-        if (minPriceVal !== null && !isNaN(minPriceVal)) {
-          const minVal = Math.min(minPriceVal, entryPriceVal, exitPriceVal);
-          const diff = entryPriceVal - minVal;
-          if (currentDirection === "long") {
-            mae = diff * qtyVal * mult;
+        if (minPriceVal !== null && !isNaN(minPriceVal) && minPriceVal > 0) {
+          if (entryPriceVal > 0 && minPriceVal > entryPriceVal * 0.1 && minPriceVal < entryPriceVal * 3) {
+            const minVal = Math.min(minPriceVal, entryPriceVal, exitPriceVal);
+            const diff = entryPriceVal - minVal;
+            if (currentDirection === "long") mae = diff * qtyVal * mult;
+            else mfe = diff * qtyVal * mult;
           } else {
-            mfe = diff * qtyVal * mult;
+            if (currentDirection === "long") mae = minPriceVal;
+            else mfe = minPriceVal;
           }
         }
       }
