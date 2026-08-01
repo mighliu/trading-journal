@@ -812,7 +812,7 @@ class StateManager {
         const s = String(t.status || "executed").toLowerCase().trim();
         const targetS = String(this.activeFilters.status).toLowerCase().trim();
         if (targetS === "executed") {
-          return s === "executed" || s === "closed" || s === "filled" || s === "taken" || s === "win" || s === "loss" || s === "";
+          return s !== "skipped" && s !== "cancelled" && s !== "canceled" && s !== "rejected" && s !== "invalid";
         }
         if (targetS === "skipped") {
           return s === "skipped" || s === "cancelled" || s === "canceled" || s === "rejected" || s === "invalid";

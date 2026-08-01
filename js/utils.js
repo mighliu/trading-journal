@@ -372,10 +372,10 @@ export function getDateRange(preset, baseDate = new Date()) {
       start.setHours(0, 0, 0, 0);
       break;
     case "allTime":
-      return { start: new Date(0), end };
+      return { start: new Date(0), end: new Date(8640000000000000) };
     default:
       // Default to allTime if preset not recognized
-      return { start: new Date(0), end };
+      return { start: new Date(0), end: new Date(8640000000000000) };
   }
   
   return { start, end };
@@ -1673,8 +1673,7 @@ export function compressImage(file, maxWidth = 1000, quality = 0.8) {
 
 export function isExecutedTrade(trade) {
   if (!trade) return false;
-  const s = String(trade.status || "executed").toLowerCase().trim();
-  return s === "executed" || s === "closed" || s === "filled" || s === "taken" || s === "win" || s === "loss" || s === "";
+  return !isSkippedTrade(trade);
 }
 
 export function isSkippedTrade(trade) {
