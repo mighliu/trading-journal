@@ -2098,16 +2098,19 @@ body.light-theme .live-math-bottom {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  min-width: 22px;
   height: 22px;
-  border-radius: 50%;
+  padding: 0 6px;
+  border-radius: 11px;
   font-size: 0.75rem;
   font-weight: 700;
   background: var(--bg-card);
   border: 1px solid var(--border);
+  white-space: nowrap;
 }
 .badge-grade-a { color: #34d399; border-color: rgba(52, 211, 153, 0.4); }
 .badge-grade-b { color: #60a5fa; border-color: rgba(96, 165, 250, 0.4); }
 .badge-grade-c { color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); }
 .badge-grade-d { color: #f97316; border-color: rgba(249, 115, 22, 0.4); }
 .badge-grade-f { color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+.badge-grade-unspecified { color: var(--text-secondary); border-color: var(--border); }
