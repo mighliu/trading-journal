@@ -52,6 +52,7 @@ async function saveDbBinaryToIndexedDB(uint8Array) {
 
 class StateManager {
   constructor() {
+    this.listeners = [];
     this.trades = [];
     this.db = null;
     this.settings = {
@@ -363,12 +364,20 @@ class StateManager {
   }
 
   onChange(callback) {
-    this.callbacks.push(callback);
+    if (typeof callback === "function" && !this.callbacks.includes(callback)) {
+      this.callbacks.push(callback);
+    }
+  }
+
+  subscribe(callback) {
+    this.onChange(callback);
   }
 
   notify() {
-    for (const cb of this.callbacks) {
-      cb();
+    if (Array.isArray(this.callbacks)) {
+      this.callbacks.forEach(fn => {
+        try { fn(); } catch(e) { console.error("Error in state subscriber:", e); }
+      });
     }
   }
 
@@ -488,6 +497,7 @@ class StateManager {
     this.trades = this.trades.filter(t => t.id !== id);
     if (this.trades.length === beforeLen) throw new Error("Trade not found");
     this.saveToStorage();
+    this.notify();
   }
 
   clearAllData() {
@@ -507,6 +517,7 @@ class StateManager {
       currentAccount
     };
     this.saveToStorage();
+    this.notify();
   }
 
   clearCurrentAccountTrades() {
@@ -516,6 +527,7 @@ class StateManager {
     }
     this.trades = this.trades.filter(t => t.accountId !== activeAccount);
     this.saveToStorage();
+    this.notify();
   }
 
   deleteCurrentAccount() {
@@ -539,6 +551,7 @@ class StateManager {
     this.settings.defaultFees = this.settings.accounts[nextAccount].defaultFees || 0;
     
     this.saveToStorage();
+    this.notify();
   }
 
   addAccount(name, startingBalance = 25000, defaultFees = 0) {
@@ -565,6 +578,7 @@ class StateManager {
     this.settings.defaultFees = parseFloat(defaultFees) || 0;
 
     this.saveToStorage();
+    this.notify();
   }
 
   setFilters(filters) {
@@ -671,6 +685,20 @@ class StateManager {
   updateSettings(newSettings) {
     this.settings = { ...this.settings, ...newSettings };
     this.saveToStorage();
+    this.notify();
+  }
+
+  
+  subscribe(listener) {
+    if (typeof listener === "function" && !this.listeners.includes(listener)) {
+      this.listeners.push(listener);
+    }
+  }
+
+  notify() {
+    this.listeners.forEach(fn => {
+      try { fn(); } catch(e) { console.error("Error in state subscriber:", e); }
+    });
   }
 
   getFilteredTrades() {
@@ -916,7 +944,15 @@ class StateManager {
             }
           });
 
+          this.activeFilters.datePreset = "allTime";
+          this.activeFilters.symbol = "";
+          this.activeFilters.direction = "all";
+          this.activeFilters.outcome = "all";
+          this.activeFilters.setup = "all";
+          this.activeFilters.assetClass = "all";
+          this.activeFilters.status = "executed";
           this.saveToStorage();
+          this.notify();
           resolve({ total: validated.length, added: addedCount, skipped: skippedCount });
         } catch (err) {
           reject(new Error("Invalid JSON format: " + err.message));
@@ -1155,7 +1191,15 @@ class StateManager {
             }
           });
 
+          this.activeFilters.datePreset = "allTime";
+          this.activeFilters.symbol = "";
+          this.activeFilters.direction = "all";
+          this.activeFilters.outcome = "all";
+          this.activeFilters.setup = "all";
+          this.activeFilters.assetClass = "all";
+          this.activeFilters.status = "executed";
           this.saveToStorage();
+          this.notify();
           resolve({ total: parsedTrades.length, added: addedCount, skipped: skippedCount });
         } catch (err) {
           reject(new Error("Failed to parse Excel file: " + err.message));

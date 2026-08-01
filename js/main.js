@@ -84,6 +84,10 @@ function handleStateChange() {
   const filteredTrades = AppState.getFilteredTrades();
   const allTrades = AppState.trades;
 
+  // Sync filter dropdowns UI
+  const datePresetElem = document.getElementById("filterDatePreset");
+  if (datePresetElem) datePresetElem.value = AppState.activeFilters.datePreset || "allTime";
+
   // Sync accounts list
   populateAccountSelector();
 
