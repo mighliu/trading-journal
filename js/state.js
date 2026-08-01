@@ -169,6 +169,25 @@ class StateManager {
     });
   }
 
+  async migrateFromLocalStorage() {
+    if (!this.db) return;
+    try {
+      const storedTrades = localStorage.getItem("tf_trades");
+      if (storedTrades) {
+        const parsed = JSON.parse(storedTrades);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed.forEach(t => this.insertTradeSql(t));
+        }
+      }
+      const storedSettings = localStorage.getItem("tf_settings");
+      if (storedSettings) {
+        this.db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?)", [storedSettings]);
+      }
+    } catch (e) {
+      console.error("migrateFromLocalStorage error:", e);
+    }
+  }
+
   insertTradeSql(t) {
     if (!this.db) return;
     try {
@@ -292,10 +311,15 @@ class StateManager {
         });
       }
       stmtTrades.free();
-      this.trades = loadedTrades;
-      console.log(`Loaded ${loadedTrades.length} trades from SQLite WASM database.`);
+      if (loadedTrades.length > 0) {
+        this.trades = loadedTrades;
+        console.log(`Loaded ${loadedTrades.length} trades from SQLite WASM database.`);
+      } else {
+        this.loadFromStorage();
+      }
     } catch (err) {
       console.error("loadFromSqlite error:", err);
+      this.loadFromStorage();
     }
   }
 
@@ -349,13 +373,12 @@ class StateManager {
 
   async saveToStorage() {
     try {
+      localStorage.setItem("tf_trades", JSON.stringify(this.trades));
+      localStorage.setItem("tf_settings", JSON.stringify(this.settings));
       if (this.db) {
         this.db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?)", [JSON.stringify(this.settings)]);
         const binary = this.db.export();
         await saveDbBinaryToIndexedDB(binary);
-      } else {
-        localStorage.setItem("tf_trades", JSON.stringify(this.trades));
-        localStorage.setItem("tf_settings", JSON.stringify(this.settings));
       }
       this.notify();
     } catch (e) {
