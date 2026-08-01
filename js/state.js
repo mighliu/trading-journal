@@ -314,6 +314,7 @@ class StateManager {
       if (loadedTrades.length > 0) {
         this.trades = loadedTrades;
         console.log(`Loaded ${loadedTrades.length} trades from SQLite WASM database.`);
+        this.sanitizeLoadedTrades();
       } else {
         this.loadFromStorage();
       }
@@ -331,6 +332,7 @@ class StateManager {
       } else {
         this.trades = [];
       }
+      this.sanitizeLoadedTrades();
 
       const storedSettings = localStorage.getItem("tf_settings");
       if (storedSettings) {
@@ -368,6 +370,55 @@ class StateManager {
     } catch (e) {
       console.error("Failed to load from localStorage:", e);
       this.trades = [];
+    }
+  }
+
+  sanitizeLoadedTrades() {
+    if (!Array.isArray(this.trades) || this.trades.length === 0) return;
+
+    let fixedCount = 0;
+    this.trades.forEach(t => {
+      let modified = false;
+      const entry = parseFloat(t.entryPrice) || 0;
+      if (entry > 0) {
+        const maxP = t.maxPrice != null ? parseFloat(t.maxPrice) : null;
+        const minP = t.minPrice != null ? parseFloat(t.minPrice) : null;
+
+        // If maxPrice or minPrice is absurdly out of range (> 1.35x or < 0.5x entry price), reset it
+        if (maxP != null && (maxP > entry * 1.35 || maxP < entry * 0.5)) {
+          t.maxPrice = null;
+          modified = true;
+        }
+        if (minP != null && (minP > entry * 1.35 || minP < entry * 0.5)) {
+          t.minPrice = null;
+          modified = true;
+        }
+      }
+
+      if (t.mfe != null && parseFloat(t.mfe) > 20000) {
+        t.mfe = null;
+        modified = true;
+      }
+      if (t.mae != null && parseFloat(t.mae) > 20000) {
+        t.mae = null;
+        modified = true;
+      }
+
+      if (modified) {
+        fixedCount++;
+        if (this.db && t.id) {
+          try {
+            this.db.run(
+              "UPDATE trades SET max_price = ?, min_price = ?, mfe = ?, mae = ? WHERE id = ?",
+              [t.maxPrice, t.minPrice, t.mfe, t.mae, t.id]
+            );
+          } catch(e) {}
+        }
+      }
+    });
+
+    if (fixedCount > 0) {
+      console.log(`Sanitized MFE/MAE price bounds for ${fixedCount} trades.`);
     }
   }
 
@@ -638,8 +689,24 @@ class StateManager {
         assetClass = "options";
       }
 
-      let maxPrice = t.maxPrice;
-      let minPrice = t.minPrice;
+      let maxPrice = t.maxPrice != null ? parseFloat(t.maxPrice) : null;
+      let minPrice = t.minPrice != null ? parseFloat(t.minPrice) : null;
+
+      // Sanity check price bounds: maxPrice and minPrice MUST be asset prices near entryPrice
+      if (t.entryPrice > 0) {
+        if (maxPrice != null && (maxPrice > t.entryPrice * 1.35 || maxPrice < t.entryPrice * 0.5)) {
+          maxPrice = null;
+        }
+        if (minPrice != null && (minPrice > t.entryPrice * 1.35 || minPrice < t.entryPrice * 0.5)) {
+          minPrice = null;
+        }
+      }
+
+      let mfe = t.mfe != null ? parseFloat(t.mfe) : null;
+      let mae = t.mae != null ? parseFloat(t.mae) : null;
+      if (mfe != null && mfe > 20000) mfe = null;
+      if (mae != null && mae > 20000) mae = null;
+
       if (maxPrice == null || minPrice == null) {
         const higher = Math.max(t.entryPrice, t.exitPrice);
         const lower = Math.min(t.entryPrice, t.exitPrice);
@@ -690,8 +757,8 @@ class StateManager {
         interventionType: t.interventionType || "followed",
         maxPrice,
         minPrice,
-        mfe: t.mfe != null ? parseFloat(t.mfe) : null,
-        mae: t.mae != null ? parseFloat(t.mae) : null,
+        mfe,
+        mae,
         checklistItems: t.checklistItems || null,
         adherenceScore: t.adherenceScore !== undefined ? t.adherenceScore : null
       };
@@ -1353,8 +1420,10 @@ class StateManager {
           overridePnl: manualPnl != null,
           manualPnl: manualPnl,
           interventionType: "followed",
-          maxPrice: mfeVal,
-          minPrice: maeVal
+          maxPrice: null,
+          minPrice: null,
+          mfe: mfeVal != null && mfeVal < 20000 ? mfeVal : null,
+          mae: maeVal != null && maeVal < 20000 ? maeVal : null
         });
       }
     } else {
@@ -1380,6 +1449,8 @@ class StateManager {
         const targetAccount = (rowAccount && rowAccount !== "" && rowAccount.toLowerCase() !== "undefined") ? rowAccount : activeAccount;
 
         const manualPnl = profitCol !== -1 && row[profitCol] !== "" ? parseFloat(row[profitCol]) : null;
+        const rowRunUp = runUpCol !== -1 && row[runUpCol] !== "" ? Math.abs(parseFloat(row[runUpCol])) : null;
+        const rowDrawdown = drawdownCol !== -1 && row[drawdownCol] !== "" ? Math.abs(parseFloat(row[drawdownCol])) : null;
 
         parsedTrades.push({
           id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
@@ -1405,8 +1476,10 @@ class StateManager {
           overridePnl: manualPnl != null,
           manualPnl: manualPnl,
           interventionType: "followed",
-          maxPrice: runUpCol !== -1 && row[runUpCol] !== "" ? parseFloat(row[runUpCol]) : null,
-          minPrice: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null
+          maxPrice: null,
+          minPrice: null,
+          mfe: rowRunUp != null && rowRunUp < 20000 ? rowRunUp : null,
+          mae: rowDrawdown != null && rowDrawdown < 20000 ? rowDrawdown : null
         });
       }
     }
