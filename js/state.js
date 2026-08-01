@@ -369,7 +369,7 @@ class StateManager {
       }
     } catch (e) {
       console.error("Failed to load from localStorage:", e);
-      this.trades = [];
+      if (!Array.isArray(this.trades)) this.trades = [];
     }
   }
 
@@ -380,9 +380,10 @@ class StateManager {
     this.trades.forEach(t => {
       let modified = false;
       const entry = parseFloat(t.entryPrice) || 0;
+      const exit = parseFloat(t.exitPrice) || entry;
       if (entry > 0) {
-        const maxP = t.maxPrice != null ? parseFloat(t.maxPrice) : null;
-        const minP = t.minPrice != null ? parseFloat(t.minPrice) : null;
+        let maxP = t.maxPrice != null ? parseFloat(t.maxPrice) : null;
+        let minP = t.minPrice != null ? parseFloat(t.minPrice) : null;
 
         // If maxPrice or minPrice is absurdly out of range (> 1.35x or < 0.5x entry price), reset it
         if (maxP != null && (maxP > entry * 1.35 || maxP < entry * 0.5)) {
