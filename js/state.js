@@ -722,9 +722,21 @@ class StateManager {
   }
 
   getStorageUsage() {
-    const str = JSON.stringify(this.trades) + JSON.stringify(this.settings);
-    const bytesUsed = str.length * 2;
-    const maxBytes = 5 * 1024 * 1024;
+    let bytesUsed = 0;
+    if (this.db) {
+      try {
+        const binary = this.db.export();
+        bytesUsed = binary.byteLength;
+      } catch (e) {
+        bytesUsed = (JSON.stringify(this.trades) + JSON.stringify(this.settings)).length * 2;
+      }
+    } else {
+      const str = JSON.stringify(this.trades) + JSON.stringify(this.settings);
+      bytesUsed = str.length * 2;
+    }
+
+    // High capacity limit for IndexedDB storage (500 MB)
+    const maxBytes = 500 * 1024 * 1024;
     return {
       bytesUsed,
       maxBytes,

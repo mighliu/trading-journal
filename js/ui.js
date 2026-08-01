@@ -994,6 +994,14 @@ export function closeSettingsModal() {
   if (modal) modal.classList.remove("open");
 }
 
+function formatBytes(bytes) {
+  if (!bytes || bytes <= 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
 function updateStorageIndicator() {
   const usage = AppState.getStorageUsage();
   const progressBar = document.getElementById("storageUsageBar");
@@ -1001,8 +1009,8 @@ function updateStorageIndicator() {
 
   if (!progressBar || !label) return;
 
-  progressBar.style.width = `${usage.percentage}%`;
-  label.textContent = `${(usage.bytesUsed / 1024).toFixed(1)} KB used of 5 MB (${usage.percentage.toFixed(2)}%)`;
+  progressBar.style.width = `${Math.max(usage.percentage, 0.5)}%`;
+  label.textContent = `${formatBytes(usage.bytesUsed)} used of ${formatBytes(usage.maxBytes)} (${usage.percentage.toFixed(2)}%)`;
 
   if (usage.percentage > 80) {
     progressBar.style.backgroundColor = "var(--loss)";
