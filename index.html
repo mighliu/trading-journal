@@ -17,6 +17,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
   <!-- SheetJS Excel Parser CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- jsPDF for PDF Performance Report Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <!-- Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -77,6 +79,7 @@
             <button id="exportCsvBtn"><i data-lucide="file-spreadsheet"></i> CSV File</button>
             <button id="exportJsonBtn"><i data-lucide="braces"></i> JSON File</button>
             <button id="exportSqliteBtn"><i data-lucide="database"></i> SQLite DB File</button>
+            <button id="exportPdfBtn"><i data-lucide="file-text"></i> PDF Report</button>
           </div>
         </div>
 
@@ -85,6 +88,10 @@
         </button>
         <input type="file" id="importFileInput" class="hidden" accept=".json,.csv,.xlsx">
 
+        <button id="keyboardShortcutsBtn" class="btn-icon" title="Keyboard Shortcuts (?)"
+          style="font-size: 0.875rem; font-weight: 700; font-family: monospace; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 6px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;">
+          ?
+        </button>
         <button id="themeToggleBtn" class="btn-icon" title="Toggle Dark/Light Theme">
           <svg id="themeSunIcon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
           <svg id="themeMoonIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -94,6 +101,20 @@
         </button>
       </div>
     </header>
+
+    <!-- Dark Streak Warning Banner (auto-shows when on losing streak) -->
+    <div id="darkStreakBanner" class="dark-streak-banner hidden">
+      <div class="dark-streak-content">
+        <i data-lucide="alert-triangle" style="width: 22px; height: 22px; flex-shrink: 0;"></i>
+        <div>
+          <strong id="darkStreakTitle" style="display: block; margin-bottom: 2px; font-size: 0.9rem;">Losing Streak Warning</strong>
+          <span id="darkStreakMessage" style="font-size: 0.8125rem;">You are on a consecutive losing streak. Review your plan before the next trade.</span>
+        </div>
+      </div>
+      <button id="darkStreakDismissBtn" class="btn-icon" title="Dismiss" style="color: inherit; flex-shrink: 0;">
+        <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+      </button>
+    </div>
 
     <!-- Seed Notice Banner (appears when database is empty) -->
     <div id="seedNotice" class="seed-notice-banner hidden">
@@ -687,6 +708,21 @@
           </div>
         </div>
 
+        <!-- ── Group 5: Session Time Heatmap ────────────────────────────── -->
+        <div style="display:flex;align-items:center;gap:12px;margin:0 0 14px;">
+          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Session Performance Heatmap</span>
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
+        </div>
+        <div class="chart-card" style="margin-bottom: 24px;">
+          <div class="chart-header">
+            <h3 class="chart-title">
+              <i data-lucide="grid" style="color: #a78bfa"></i> Time-of-Day × Day-of-Week P&L Heatmap
+              <span class="tooltip-trigger" data-tooltip="Shows your average P&L intensity for each hour of the day and day of the week. Green = profitable time slots, Red = losing time slots. Darker shades = more extreme performance."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span>
+            </h3>
+          </div>
+          <div id="sessionHeatmapContainer" style="overflow-x: auto; padding: 12px 0 4px;"></div>
+        </div>
+
       </div>
 
       <!-- Intervention Edge Tab Content -->
@@ -1095,6 +1131,49 @@
           <div class="chart-container-medium" style="height: 250px;"><canvas id="timelineReplayChart"></canvas></div>
         </div>
 
+        <!-- ── Group 5: Trailing Drawdown Simulator ──────────────────────── -->
+        <div style="display:flex;align-items:center;gap:12px;margin:28px 0 14px;">
+          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Prop Firm Trailing Drawdown Simulator</span>
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
+        </div>
+        <div class="chart-card" style="margin-bottom: 28px;">
+          <div class="chart-header" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <h3 class="chart-title"><i data-lucide="shield-check" style="color: #f59e0b"></i> Trailing Drawdown Simulator <span class="tooltip-trigger" data-tooltip="Simulates a prop firm's trailing drawdown rule against your actual trades to reveal if and when your account would have been breached."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              <button type="button" id="runTrailingSimBtn" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;"><i data-lucide="play" style="width: 12px; height: 12px;"></i> Run Simulation</button>
+            </div>
+            <!-- Sim Inputs -->
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; width: 100%;">
+              <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
+                <label for="simAccountSize" style="font-size: 0.75rem;">Account Size ($)</label>
+                <input type="number" id="simAccountSize" value="50000" step="1000" min="1000" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 5px 10px; color: var(--text-primary); font-family: inherit; font-size: 0.8125rem; width: 100%;">
+              </div>
+              <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
+                <label for="simMaxDrawdownPct" style="font-size: 0.75rem;">Max Trailing Drawdown (%)</label>
+                <input type="number" id="simMaxDrawdownPct" value="5" step="0.5" min="1" max="50" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 5px 10px; color: var(--text-primary); font-family: inherit; font-size: 0.8125rem; width: 100%;">
+              </div>
+              <div class="form-group" style="margin-bottom: 0; min-width: 180px;">
+                <label for="simDrawdownStyle" style="font-size: 0.75rem;">Drawdown Style</label>
+                <select id="simDrawdownStyle" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 5px 10px; color: var(--text-primary); font-family: inherit; font-size: 0.8125rem; width: 100%;">
+                  <option value="trailing_from_peak">Trailing from Peak (EOD)</option>
+                  <option value="trailing_from_start">Fixed from Starting Balance</option>
+                </select>
+              </div>
+            </div>
+            <!-- Sim Stats Bar -->
+            <div id="trailingSimStatsBar" style="display: flex; gap: 14px; font-size: 0.8125rem; color: var(--text-secondary); flex-wrap: wrap; align-items: center;">
+              <span>Status: <strong id="tsimStatus" style="color: var(--profit);">--</strong></span>
+              <span>•</span>
+              <span>Closest Breach: <strong id="tsimClosestBreach" style="color: var(--loss);">--</strong></span>
+              <span>•</span>
+              <span>Days Safe: <strong id="tsimDaysSafe">--</strong></span>
+              <span>•</span>
+              <span>Breach Events: <strong id="tsimBreachEvents" style="color: var(--loss);">--</strong></span>
+            </div>
+          </div>
+          <div class="chart-container-medium" style="height: 300px;"><canvas id="trailingDrawdownChart"></canvas></div>
+        </div>
+
       </div>
 
     </main>
@@ -1368,12 +1447,28 @@
 
             <!-- Text Fields -->
             <div class="form-group">
-              <label for="tradeNotes">Trading Notes (Thesis/Context)</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="tradeNotes" style="margin-bottom: 0;">Trading Notes (Thesis/Context)</label>
+                <div class="note-template-pills" id="noteTemplatePills">
+                  <span class="note-template-label">Templates:</span>
+                  <button type="button" class="note-tpl-btn" data-template="setup">Setup</button>
+                  <button type="button" class="note-tpl-btn" data-template="psychology">Psychology</button>
+                  <button type="button" class="note-tpl-btn" data-template="mistake">Mistake</button>
+                  <button type="button" class="note-tpl-btn" data-template="winning">Win</button>
+                  <button type="button" class="note-tpl-btn" data-template="skipped">Skipped</button>
+                </div>
+              </div>
               <textarea id="tradeNotes" placeholder="Describe the market context, catalyst, order flow..." rows="3"></textarea>
             </div>
             
             <div class="form-group">
-              <label for="tradeLessons">Lessons & Reflection</label>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="tradeLessons" style="margin-bottom: 0;">Lessons & Reflection</label>
+                <div class="note-template-pills">
+                  <button type="button" class="note-tpl-btn" data-template="lesson" data-target="lessons">Lesson</button>
+                  <button type="button" class="note-tpl-btn" data-template="process">Process</button>
+                </div>
+              </div>
               <textarea id="tradeLessons" placeholder="Reflect on execution, discipline, emotions, rules..." rows="2"></textarea>
             </div>
 

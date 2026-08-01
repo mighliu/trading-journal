@@ -3960,3 +3960,251 @@ export function renderMonteCarloChart(trades, startingBalance = 25000) {
     }
   });
 }
+
+// ============================================================
+// FEATURE: Trailing Drawdown Simulator (Prop Firm)
+// ============================================================
+export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDrawdownPct = 5, drawdownStyle = "trailing_from_peak") {
+  const canvasId = "trailingDrawdownChart";
+  destroyChart(canvasId);
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const executed = trades
+    .filter(t => isExecutedTrade(t))
+    .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
+
+  if (executed.length < 2) {
+    renderEmptyChartMessage(canvasId, "Not enough executed trades to run simulation.");
+    return;
+  }
+
+  const maxDDAmount = accountSize * (maxDrawdownPct / 100);
+
+  let equity = accountSize;
+  let peak = accountSize;
+  let breachFloor = accountSize - maxDDAmount;
+  let breachEvents = 0;
+  let daysSafe = 0;
+  let closestBreachPct = Infinity; // track % distance from breach
+
+  const equityPath = [accountSize];
+  const floorPath = [breachFloor];
+  const labels = ["Start"];
+  const breachPoints = [null];
+
+  for (let i = 0; i < executed.length; i++) {
+    const t = executed[i];
+    const pnl = calcNetPnl(t);
+    equity += pnl;
+
+    if (drawdownStyle === "trailing_from_peak") {
+      if (equity > peak) {
+        peak = equity;
+        breachFloor = peak - maxDDAmount;
+      }
+    } else {
+      // Fixed from start — floor never moves
+      breachFloor = accountSize - maxDDAmount;
+    }
+
+    const distancePct = ((equity - breachFloor) / accountSize) * 100;
+    if (distancePct < closestBreachPct) closestBreachPct = distancePct;
+
+    if (equity <= breachFloor) {
+      breachEvents++;
+      breachPoints.push(equity);
+    } else {
+      breachPoints.push(null);
+      daysSafe++;
+    }
+
+    const label = new Date(t.exitDateTime).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    labels.push(label);
+    equityPath.push(equity);
+    floorPath.push(breachFloor);
+  }
+
+  // Update stats bar
+  const statusEl = document.getElementById("tsimStatus");
+  const closestEl = document.getElementById("tsimClosestBreach");
+  const daysSafeEl = document.getElementById("tsimDaysSafe");
+  const breachEventsEl = document.getElementById("tsimBreachEvents");
+
+  const passed = breachEvents === 0;
+  if (statusEl) {
+    statusEl.textContent = passed ? "✅ PASSED" : "❌ BREACHED";
+    statusEl.style.color = passed ? "var(--profit)" : "var(--loss)";
+  }
+  if (closestEl) {
+    const pctText = closestBreachPct === Infinity ? "--" : `${closestBreachPct.toFixed(2)}%`;
+    closestEl.textContent = pctText;
+  }
+  if (daysSafeEl) daysSafeEl.textContent = `${daysSafe} trades`;
+  if (breachEventsEl) breachEventsEl.textContent = breachEvents > 0 ? `${breachEvents} breach(es)` : "None";
+
+  // Chart
+  chartInstances[canvasId] = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Simulated Equity",
+          data: equityPath,
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56, 189, 248, 0.08)",
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          tension: 0.15,
+          fill: false,
+          order: 1
+        },
+        {
+          label: "Trailing Drawdown Floor",
+          data: floorPath,
+          borderColor: "#ef4444",
+          backgroundColor: "rgba(239, 68, 68, 0.07)",
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          order: 2
+        },
+        {
+          label: "Breach Events",
+          data: breachPoints,
+          borderColor: "transparent",
+          backgroundColor: "#ef4444",
+          borderWidth: 0,
+          pointRadius: 7,
+          pointStyle: "circle",
+          pointHoverRadius: 9,
+          showLine: false,
+          order: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: { color: getTickColor(), font: { family: "Inter, sans-serif", size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              if (ctx.parsed.y === null) return "";
+              if (ctx.dataset.label === "Breach Events") return `⚠️ Breach at $${Math.round(ctx.parsed.y).toLocaleString()}`;
+              return `${ctx.dataset.label}: $${Math.round(ctx.parsed.y).toLocaleString()}`;
+            }
+          }
+        },
+        annotation: undefined
+      },
+      scales: {
+        x: {
+          grid: { color: getGridColor() },
+          ticks: { color: getTickColor(), maxTicksLimit: 14 }
+        },
+        y: {
+          grid: { color: getGridColor() },
+          ticks: {
+            color: getTickColor(),
+            callback: (val) => `$${(val / 1000).toFixed(0)}k`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// FEATURE: Session Time Heatmap
+// ============================================================
+export function renderSessionHeatmap(trades) {
+  const container = document.getElementById("sessionHeatmapContainer");
+  if (!container) return;
+
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17];
+  const hourLabels = ["9am", "10am", "11am", "12pm", "1pm", "2pm", "3pm", "4pm", "5pm"];
+
+  // Build a map: day (0=Mon) × hour => { total, count }
+  const grid = Array.from({ length: hours.length }, () =>
+    Array.from({ length: 7 }, () => ({ total: 0, count: 0, wins: 0 }))
+  );
+
+  for (const t of trades) {
+    if (!t.entryDateTime) continue;
+    const pnl = calcNetPnl(t);
+    const dt = new Date(t.entryDateTime);
+    const dayIdx = (dt.getDay() + 6) % 7; // 0=Mon, 6=Sun
+    const hr = dt.getHours();
+    const hourIdx = hours.indexOf(hr);
+    if (hourIdx === -1 || dayIdx < 0 || dayIdx > 6) continue;
+    grid[hourIdx][dayIdx].total += pnl;
+    grid[hourIdx][dayIdx].count++;
+    if (pnl > 0) grid[hourIdx][dayIdx].wins++;
+  }
+
+  // Find max abs value for normalization
+  let maxAbs = 0;
+  for (const row of grid) for (const cell of row) {
+    if (cell.count > 0) {
+      const avg = Math.abs(cell.total / cell.count);
+      if (avg > maxAbs) maxAbs = avg;
+    }
+  }
+  if (maxAbs === 0) maxAbs = 1;
+
+  const isLight = document.body.classList.contains("light-theme");
+
+  // Render table
+  let html = `<table class="session-heatmap-table"><thead><tr><th></th>`;
+  for (const d of days) html += `<th>${d}</th>`;
+  html += `</tr></thead><tbody>`;
+
+  for (let hIdx = 0; hIdx < hours.length; hIdx++) {
+    html += `<tr><td class="hour-label">${hourLabels[hIdx]}</td>`;
+    for (let dIdx = 0; dIdx < 7; dIdx++) {
+      const { total, count, wins } = grid[hIdx][dIdx];
+      if (count === 0) {
+        html += `<td style="background: ${isLight ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.03)"}; color: var(--text-muted);">
+          <span class="heatmap-cell-val">—</span>
+        </td>`;
+      } else {
+        const avg = total / count;
+        const intensity = Math.min(Math.abs(avg) / maxAbs, 1);
+        const isProfit = avg >= 0;
+        let bg, textColor;
+        if (isProfit) {
+          const alpha = 0.12 + intensity * 0.65;
+          bg = `rgba(16, 185, 129, ${alpha.toFixed(2)})`;
+          textColor = intensity > 0.5 ? "#ffffff" : "#34d399";
+        } else {
+          const alpha = 0.12 + intensity * 0.65;
+          bg = `rgba(239, 68, 68, ${alpha.toFixed(2)})`;
+          textColor = intensity > 0.5 ? "#ffffff" : "#f87171";
+        }
+        const avgStr = avg >= 0 ? `+$${Math.round(avg)}` : `-$${Math.abs(Math.round(avg))}`;
+        const wr = Math.round((wins / count) * 100);
+        const title = `${days[dIdx]} ${hourLabels[hIdx]} | Avg: ${avgStr} | ${count} trade${count !== 1 ? "s" : ""} | WR: ${wr}%`;
+        html += `<td style="background: ${bg}; color: ${textColor};" title="${title}">
+          <span class="heatmap-cell-val">${avgStr}</span>
+          <span class="heatmap-cell-count">${count}t · ${wr}%</span>
+        </td>`;
+      }
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+
+  container.innerHTML = html;
+}
+
