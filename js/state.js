@@ -1091,8 +1091,42 @@ class StateManager {
           if (typeof window.XLSX !== "undefined") {
             const data = new Uint8Array(e.target.result);
             const workbook = window.XLSX.read(data, { type: "array" });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            sheetRows = window.XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            
+            const sheetNames = workbook.SheetNames || [];
+            if (sheetNames.length === 0) {
+              return reject(new Error("Excel file contains no worksheets."));
+            }
+
+            // 1. Prefer sheet named "Trades" or "Trade Log" or "Trade List" (TradingView export format)
+            let selectedSheetName = sheetNames.find(n => {
+              const norm = String(n).toLowerCase().trim();
+              return norm === "trades" || norm === "trade log" || norm === "trade list" || norm === "trades list";
+            });
+
+            // 2. Scan sheets for headers matching trade data if "Trades" sheet not found
+            if (!selectedSheetName) {
+              for (const name of sheetNames) {
+                const sheet = workbook.Sheets[name];
+                if (!sheet) continue;
+                const rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                if (rows && rows.length > 1) {
+                  const headers = rows[0].map(h => String(h || "").toLowerCase().trim());
+                  if (headers.some(h => h.includes("trade number") || h.includes("trade #") || h.includes("net pnl") || h.includes("entry price") || h.includes("price usd"))) {
+                    selectedSheetName = name;
+                    sheetRows = rows;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (!selectedSheetName) {
+              selectedSheetName = sheetNames[0];
+            }
+
+            if (sheetRows.length === 0 && workbook.Sheets[selectedSheetName]) {
+              sheetRows = window.XLSX.utils.sheet_to_json(workbook.Sheets[selectedSheetName], { header: 1 });
+            }
           } else {
             const text = new TextDecoder().decode(e.target.result);
             const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
@@ -1148,20 +1182,21 @@ class StateManager {
 
     const headers = sheetRows[0].map(h => String(h || "").trim());
     
-    const tradeNumCol = findColIdx(headers, ["trade #", "trade number", "trade_id", "tradeid"]);
+    const tradeNumCol = findColIdx(headers, ["trade number", "trade #", "trade_id", "tradeid"]);
     const typeCol = findColIdx(headers, ["type", "side", "direction", "action", "order type"]);
     const signalCol = findColIdx(headers, ["signal", "order name", "strategy"]);
-    const dateTimeCol = findColIdx(headers, ["date/time", "date & time", "datetime", "timestamp", "time"]);
+    const dateTimeCol = findColIdx(headers, ["date and time", "date/time", "date & time", "datetime", "timestamp", "time"]);
     const entryDateCol = findColIdx(headers, ["entry date", "open date", "open time", "entry time"]);
     const exitDateCol = findColIdx(headers, ["exit date", "close date", "close time", "exit time"]);
     const priceCol = findColIdx(headers, ["price usd", "price", "fill price", "avg price", "avg fill"]);
     const entryPriceCol = findColIdx(headers, ["entry price", "open price", "buy price"]);
     const exitPriceCol = findColIdx(headers, ["exit price", "close price", "sell price"]);
-    const qtyCol = findColIdx(headers, ["contracts", "shares", "quantity", "qty", "size", "amount", "volume"]);
-    const profitCol = findColIdx(headers, ["profit usd", "profit", "pnl", "net pnl", "net profit", "realized pnl"]);
+    const qtyCol = findColIdx(headers, ["size (qty)", "size", "contracts", "shares", "quantity", "qty", "amount", "volume"]);
+    const profitCol = findColIdx(headers, ["net pnl usd", "profit usd", "profit", "pnl", "net pnl", "net profit", "realized pnl"]);
+    const feesCol = findColIdx(headers, ["commission usd", "commission", "fees", "fee"]);
     const symbolCol = findColIdx(headers, ["symbol", "ticker", "instrument", "asset", "pair", "market"]);
-    const runUpCol = findColIdx(headers, ["run-up usd", "run-up", "runup", "mfe"]);
-    const drawdownCol = findColIdx(headers, ["drawdown usd", "drawdown", "mae"]);
+    const runUpCol = findColIdx(headers, ["favorable excursion usd", "favorable excursion", "run-up usd", "run-up", "runup", "mfe"]);
+    const drawdownCol = findColIdx(headers, ["adverse excursion usd", "adverse excursion", "drawdown usd", "drawdown", "mae"]);
     const accountCol = findColIdx(headers, ["account", "account id", "accountid"]);
     const setupCol = findColIdx(headers, ["setup", "strategy"]);
     const notesCol = findColIdx(headers, ["notes", "note", "comment"]);
