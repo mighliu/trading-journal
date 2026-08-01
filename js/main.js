@@ -42,6 +42,7 @@ import {
   renderMfeMaeCharts,
   renderRMultipleChart,
   renderRollingPerformanceChart,
+  renderPostLossBehaviorChart,
   renderTimelineReplayChart,
   renderAdherencePerformanceChart,
   renderDrawdownScatterChart,
