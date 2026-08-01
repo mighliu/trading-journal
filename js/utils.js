@@ -89,16 +89,82 @@ export function calcPnlPercent(trade) {
 
 export function calcSignalPnl(trade) {
   const qty = parseFloat(trade.qty) || 0;
-  const signalEntry = parseFloat(trade.signalEntryPrice);
-  const entry = !isNaN(signalEntry) ? signalEntry : (parseFloat(trade.entryPrice) || 0);
-  const signalExit = parseFloat(trade.signalExitPrice);
-  const exit = !isNaN(signalExit) ? signalExit : (parseFloat(trade.exitPrice) || 0);
-  const directionMultiplier = trade.direction === "long" ? 1 : -1;
+  const entry = parseFloat(trade.entryPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || 0;
+  const direction = trade.direction || "long";
+  const dirMult = direction === "long" ? 1 : -1;
   const fees = parseFloat(trade.fees) || 0;
+  const mult = getEffectiveMultiplier(trade);
+  const type = trade.interventionType || "followed";
 
-  let multiplier = getEffectiveMultiplier(trade);
+  // 1. Discretionary trade taken with NO strategy signal
+  if (type === "manual_no_signal") {
+    return 0; // Mechanical strategy rule generated $0 P&L (did not take trade)
+  }
 
-  return (exit - entry) * qty * multiplier * directionMultiplier - fees;
+  // 2. Explicit signal entry & exit prices provided
+  if (trade.signalEntryPrice != null && trade.signalExitPrice != null) {
+    const sigEntry = parseFloat(trade.signalEntryPrice);
+    const sigExit = parseFloat(trade.signalExitPrice);
+    if (!isNaN(sigEntry) && !isNaN(sigExit)) {
+      return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+    }
+  }
+
+  // 3. Early Profit Cut (Strategy intended to hold for full move / max price reached)
+  if (type === "early_profit") {
+    let sigExit = trade.signalExitPrice ? parseFloat(trade.signalExitPrice) : null;
+    if (!sigExit || isNaN(sigExit)) {
+      if (direction === "long" && trade.maxPrice != null && parseFloat(trade.maxPrice) > exit) {
+        sigExit = parseFloat(trade.maxPrice);
+      } else if (direction === "short" && trade.minPrice != null && parseFloat(trade.minPrice) < exit) {
+        sigExit = parseFloat(trade.minPrice);
+      } else {
+        sigExit = direction === "long" ? exit * 1.02 : exit * 0.98;
+      }
+    }
+    const sigEntry = trade.signalEntryPrice ? parseFloat(trade.signalEntryPrice) : entry;
+    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+  }
+
+  // 4. Early Loss Cut (Strategy held to full stop loss or maximum drawdown)
+  if (type === "early_loss") {
+    let sigExit = trade.signalExitPrice ? parseFloat(trade.signalExitPrice) : null;
+    if (!sigExit || isNaN(sigExit)) {
+      if (trade.stopLoss != null && !isNaN(parseFloat(trade.stopLoss))) {
+        sigExit = parseFloat(trade.stopLoss);
+      } else if (direction === "long" && trade.minPrice != null && parseFloat(trade.minPrice) < exit) {
+        sigExit = parseFloat(trade.minPrice);
+      } else if (direction === "short" && trade.maxPrice != null && parseFloat(trade.maxPrice) > exit) {
+        sigExit = parseFloat(trade.maxPrice);
+      } else {
+        sigExit = direction === "long" ? exit * 0.98 : exit * 1.02;
+      }
+    }
+    const sigEntry = trade.signalEntryPrice ? parseFloat(trade.signalEntryPrice) : entry;
+    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+  }
+
+  // 5. Late Entry (Strategy entered earlier at signal price)
+  if (type === "late_entry") {
+    let sigEntry = trade.signalEntryPrice ? parseFloat(trade.signalEntryPrice) : null;
+    if (!sigEntry || isNaN(sigEntry)) {
+      sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
+    }
+    const sigExit = trade.signalExitPrice ? parseFloat(trade.signalExitPrice) : exit;
+    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+  }
+
+  // 6. Skipped Trades (Strategy executed trade, trader skipped it)
+  if (isSkippedTrade(trade)) {
+    if (exit !== 0 && entry !== 0) {
+      return (exit - entry) * qty * mult * dirMult - fees;
+    }
+    return 0;
+  }
+
+  // Default: Followed strategy rules
+  return (exit - entry) * qty * mult * dirMult - fees;
 }
 
 export function calcPriceDiff(p1, p2) {
