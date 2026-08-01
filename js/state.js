@@ -1086,131 +1086,45 @@ class StateManager {
       reader.onload = (e) => {
         try {
           const activeAccount = this.settings.currentAccount || "Personal";
-          let dataRows = [];
+          let sheetRows = [];
 
           if (typeof window.XLSX !== "undefined") {
             const data = new Uint8Array(e.target.result);
             const workbook = window.XLSX.read(data, { type: "array" });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const sheetRows = window.XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-            if (!sheetRows || sheetRows.length < 2) {
-              return reject(new Error("Excel sheet does not contain valid tabular data."));
-            }
-            dataRows = sheetRows;
+            sheetRows = window.XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
           } else {
             const text = new TextDecoder().decode(e.target.result);
             const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
-            if (lines.length < 2) {
-              return reject(new Error("File does not contain valid tabular data."));
-            }
-            dataRows = lines.map(line => line.split(/,|\t/));
+            sheetRows = lines.map(line => line.split(/,|\t/));
           }
 
-          const headerRow = dataRows[0].map(h => String(h || "").toLowerCase().trim());
-          const getColIdx = (name) => headerRow.findIndex(h => h.includes(name));
+          if (!sheetRows || sheetRows.length < 2) {
+            return reject(new Error("File does not contain valid tabular data."));
+          }
+
+          const parsedTrades = this.parseSpreadsheetRows(sheetRows, file.name, activeAccount);
+          if (parsedTrades.length === 0) {
+            return reject(new Error("Could not parse any valid trades from this spreadsheet. Please check the file headers."));
+          }
 
           let addedCount = 0;
           let skippedCount = 0;
 
-          dataRows.slice(1).forEach(row => {
-            if (!row || row.length < 3) return;
-
-            const symbolCol = getColIdx("symbol");
-            const rawSym = symbolCol !== -1 ? row[symbolCol] : row[1];
-            const symbol = String(rawSym || "").toUpperCase().trim();
-            if (!symbol || symbol === "UNKNOWN" || symbol === "SYMBOL") return;
-
-            const dirCol = getColIdx("direction");
-            const rawDir = dirCol !== -1 ? row[dirCol] : row[2];
-            const direction = String(rawDir || "long").toLowerCase().trim() === "short" ? "short" : "long";
-
-            const entryDateCol = getColIdx("entry date");
-            const exitDateCol = getColIdx("exit date");
-            const rawEntryDate = entryDateCol !== -1 ? row[entryDateCol] : row[3] || new Date().toISOString();
-            const rawExitDate = exitDateCol !== -1 ? row[exitDateCol] : row[4] || new Date().toISOString();
-
-            const entryPriceCol = getColIdx("entry price");
-            const exitPriceCol = getColIdx("exit price");
-            const qtyCol = getColIdx("quantity");
-            const entryPrice = parseFloat(entryPriceCol !== -1 ? row[entryPriceCol] : row[5]) || 0;
-            const exitPrice = parseFloat(exitPriceCol !== -1 ? row[exitPriceCol] : row[6]) || 0;
-            const qty = parseFloat(qtyCol !== -1 ? row[qtyCol] : row[7]) || 0;
-
-            const stopLossCol = getColIdx("stop loss");
-            const stopLossRaw = stopLossCol !== -1 ? row[stopLossCol] : row[8];
-            const stopLoss = stopLossRaw != null && stopLossRaw !== "" ? parseFloat(stopLossRaw) : null;
-
-            const feesCol = getColIdx("fees");
-            const fees = parseFloat(feesCol !== -1 ? row[feesCol] : row[9]) || 0;
-
-            const setupCol = getColIdx("setup");
-            const notesCol = getColIdx("notes");
-            const lessonsCol = getColIdx("lessons");
-            const screenshotCol = getColIdx("screenshot");
-
-            const setup = String(setupCol !== -1 ? row[setupCol] : row[10] || "").trim();
-            const notes = String(notesCol !== -1 ? row[notesCol] : row[11] || "").trim();
-            const lessons = String(lessonsCol !== -1 ? row[lessonsCol] : row[12] || "").trim();
-            const screenshotUrl = String(screenshotCol !== -1 ? row[screenshotCol] : row[13] || "").trim();
-
-            const sigEntryCol = getColIdx("signal entry");
-            const sigExitCol = getColIdx("signal exit");
-            const sigEntryRaw = sigEntryCol !== -1 ? row[sigEntryCol] : row[14];
-            const sigExitRaw = sigExitCol !== -1 ? row[sigExitCol] : row[15];
-
-            const accountCol = getColIdx("account");
-            const explicitAccount = accountCol !== -1 ? String(row[accountCol] || "").trim() : null;
-            const accountId = (explicitAccount && explicitAccount !== "" && explicitAccount.toLowerCase() !== "undefined") ? explicitAccount : activeAccount;
-
-            const mistakeCol = getColIdx("mistake");
-            const assetClassCol = getColIdx("asset class");
-            const statusCol = getColIdx("status");
-
-            const mistake = String(mistakeCol !== -1 ? row[mistakeCol] : "").trim();
-            const assetClass = String(assetClassCol !== -1 ? row[assetClassCol] : "stocks").trim() || "stocks";
-            const status = String(statusCol !== -1 ? row[statusCol] : "executed").trim() || "executed";
-
-            const trade = {
-              id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
-              symbol,
-              direction,
-              entryDateTime: normalizeDateTime(rawEntryDate),
-              exitDateTime: normalizeDateTime(rawExitDate),
-              entryPrice,
-              exitPrice,
-              qty,
-              stopLoss,
-              fees,
-              setup,
-              notes,
-              lessons,
-              screenshotUrl,
-              signalEntryPrice: sigEntryRaw != null && sigEntryRaw !== "" ? parseFloat(sigEntryRaw) : null,
-              signalExitPrice: sigExitRaw != null && sigExitRaw !== "" ? parseFloat(sigExitRaw) : null,
-              accountId,
-              mistake,
-              assetClass,
-              status,
-              overridePnl: false,
-              manualPnl: null,
-              interventionType: "followed",
-              maxPrice: null,
-              minPrice: null
-            };
-
-            if (this.isDuplicateTrade(trade)) {
+          parsedTrades.forEach(t => {
+            if (this.isDuplicateTrade(t)) {
               skippedCount++;
             } else {
               if (this.db) {
-                this.insertTradeSql(trade);
+                this.insertTradeSql(t);
               }
-              this.trades.unshift(trade);
+              this.trades.unshift(t);
               addedCount++;
             }
           });
 
           this.saveToStorage();
-          resolve({ total: dataRows.length - 1, added: addedCount, skipped: skippedCount });
+          resolve({ total: parsedTrades.length, added: addedCount, skipped: skippedCount });
         } catch (err) {
           reject(new Error("Failed to parse Excel file: " + err.message));
         }
@@ -1218,6 +1132,177 @@ class StateManager {
       reader.onerror = () => reject(new Error("Failed to read file."));
       reader.readAsArrayBuffer(file);
     });
+  }
+
+  parseSpreadsheetRows(sheetRows, fileName = "", activeAccount = "Personal") {
+    if (!sheetRows || sheetRows.length < 2) return [];
+    
+    const findColIdx = (headers, aliases) => {
+      const norm = headers.map(h => String(h || "").toLowerCase().trim());
+      for (const alias of aliases) {
+        const idx = norm.findIndex(h => h === alias || h.includes(alias));
+        if (idx !== -1) return idx;
+      }
+      return -1;
+    };
+
+    const headers = sheetRows[0].map(h => String(h || "").trim());
+    
+    const tradeNumCol = findColIdx(headers, ["trade #", "trade number", "trade_id", "tradeid"]);
+    const typeCol = findColIdx(headers, ["type", "side", "direction", "action", "order type"]);
+    const signalCol = findColIdx(headers, ["signal", "order name", "strategy"]);
+    const dateTimeCol = findColIdx(headers, ["date/time", "date & time", "datetime", "timestamp", "time"]);
+    const entryDateCol = findColIdx(headers, ["entry date", "open date", "open time", "entry time"]);
+    const exitDateCol = findColIdx(headers, ["exit date", "close date", "close time", "exit time"]);
+    const priceCol = findColIdx(headers, ["price usd", "price", "fill price", "avg price", "avg fill"]);
+    const entryPriceCol = findColIdx(headers, ["entry price", "open price", "buy price"]);
+    const exitPriceCol = findColIdx(headers, ["exit price", "close price", "sell price"]);
+    const qtyCol = findColIdx(headers, ["contracts", "shares", "quantity", "qty", "size", "amount", "volume"]);
+    const profitCol = findColIdx(headers, ["profit usd", "profit", "pnl", "net pnl", "net profit", "realized pnl"]);
+    const symbolCol = findColIdx(headers, ["symbol", "ticker", "instrument", "asset", "pair", "market"]);
+    const runUpCol = findColIdx(headers, ["run-up usd", "run-up", "runup", "mfe"]);
+    const drawdownCol = findColIdx(headers, ["drawdown usd", "drawdown", "mae"]);
+    const accountCol = findColIdx(headers, ["account", "account id", "accountid"]);
+    const setupCol = findColIdx(headers, ["setup", "strategy"]);
+    const notesCol = findColIdx(headers, ["notes", "note", "comment"]);
+    const mistakeCol = findColIdx(headers, ["mistake"]);
+    const assetClassCol = findColIdx(headers, ["asset class", "assetclass", "category"]);
+    const statusCol = findColIdx(headers, ["status"]);
+
+    // Detect fallback symbol from filename (e.g. Strategy_Report_MNQ1!_2026.xlsx -> MNQ1!)
+    let fallbackSymbol = "TRADINGVIEW";
+    const nameUpper = (fileName || "").toUpperCase();
+    const symbolMatch = nameUpper.match(/([A-Z0-9]{2,8}[0-9]?!?)/);
+    if (symbolMatch && !["REPORT", "STRATEGY", "EXPORT", "TRADES", "JOURNAL"].includes(symbolMatch[1])) {
+      fallbackSymbol = symbolMatch[1];
+    }
+
+    const parsedTrades = [];
+
+    // Case A: TradingView Two-Row Format (Entry & Exit rows paired by Trade #)
+    if (tradeNumCol !== -1 && typeCol !== -1) {
+      const tradeGroups = {};
+      for (let i = 1; i < sheetRows.length; i++) {
+        const row = sheetRows[i];
+        if (!row || row.length === 0) continue;
+        const tradeNum = row[tradeNumCol];
+        if (tradeNum == null || tradeNum === "") continue;
+        
+        if (!tradeGroups[tradeNum]) tradeGroups[tradeNum] = [];
+        tradeGroups[tradeNum].push(row);
+      }
+
+      for (const [tNum, rows] of Object.entries(tradeGroups)) {
+        if (rows.length === 0) continue;
+
+        let entryRow = rows.find(r => String(r[typeCol] || "").toLowerCase().includes("entry") || String(r[signalCol] || "").toLowerCase().includes("entry")) || rows[0];
+        let exitRow = rows.find(r => String(r[typeCol] || "").toLowerCase().includes("exit") || String(r[signalCol] || "").toLowerCase().includes("exit")) || rows[rows.length - 1];
+
+        const rawType = String(entryRow[typeCol] || "").toLowerCase();
+        const direction = (rawType.includes("short") || rawType.includes("sell")) ? "short" : "long";
+
+        const rowAccount = accountCol !== -1 && entryRow[accountCol] ? String(entryRow[accountCol]).trim() : null;
+        const targetAccount = (rowAccount && rowAccount !== "" && rowAccount.toLowerCase() !== "undefined") ? rowAccount : activeAccount;
+
+        const symbol = symbolCol !== -1 && entryRow[symbolCol] ? String(entryRow[symbolCol]).toUpperCase().trim() : fallbackSymbol;
+        
+        const entryTimeStr = dateTimeCol !== -1 ? String(entryRow[dateTimeCol] || "") : (entryDateCol !== -1 ? String(entryRow[entryDateCol] || "") : new Date().toISOString());
+        const exitTimeStr = dateTimeCol !== -1 ? String(exitRow[dateTimeCol] || "") : (exitDateCol !== -1 ? String(exitRow[exitDateCol] || "") : entryTimeStr);
+
+        const entryPrice = parseFloat(priceCol !== -1 ? entryRow[priceCol] : (entryPriceCol !== -1 ? entryRow[entryPriceCol] : 0)) || 0;
+        const exitPrice = parseFloat(priceCol !== -1 ? exitRow[priceCol] : (exitPriceCol !== -1 ? exitRow[exitPriceCol] : 0)) || entryPrice;
+        const qty = parseFloat(qtyCol !== -1 ? (entryRow[qtyCol] || exitRow[qtyCol]) : 1) || 1;
+
+        const manualPnl = profitCol !== -1 && exitRow[profitCol] !== "" ? parseFloat(exitRow[profitCol]) : null;
+        const mfeVal = runUpCol !== -1 && exitRow[runUpCol] !== "" ? Math.abs(parseFloat(exitRow[runUpCol])) : null;
+        const maeVal = drawdownCol !== -1 && exitRow[drawdownCol] !== "" ? Math.abs(parseFloat(exitRow[drawdownCol])) : null;
+
+        const setupName = setupCol !== -1 && entryRow[setupCol] ? String(entryRow[setupCol]).trim() : "TradingView Strategy";
+        const notesStr = notesCol !== -1 && entryRow[notesCol] ? String(entryRow[notesCol]).trim() : ("Imported from TradingView (Trade #" + tNum + ")");
+
+        parsedTrades.push({
+          id: "trade_tv_" + tNum + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+          symbol,
+          direction,
+          entryDateTime: normalizeDateTime(entryTimeStr),
+          exitDateTime: normalizeDateTime(exitTimeStr),
+          entryPrice,
+          exitPrice,
+          qty,
+          stopLoss: null,
+          fees: 0,
+          setup: setupName,
+          notes: notesStr,
+          lessons: "",
+          screenshotUrl: "",
+          signalEntryPrice: entryPrice,
+          signalExitPrice: exitPrice,
+          accountId: targetAccount,
+          mistake: "",
+          assetClass: symbol.startsWith("MNQ") || symbol.startsWith("NQ") || symbol.startsWith("ES") ? "futures" : "stocks",
+          status: "executed",
+          overridePnl: manualPnl != null,
+          manualPnl: manualPnl,
+          interventionType: "followed",
+          maxPrice: mfeVal,
+          minPrice: maeVal
+        });
+      }
+    } else {
+      // Case B: Standard Single Row Per Trade Format
+      for (let i = 1; i < sheetRows.length; i++) {
+        const row = sheetRows[i];
+        if (!row || row.length < 2) continue;
+
+        const symbol = symbolCol !== -1 && row[symbolCol] ? String(row[symbolCol]).toUpperCase().trim() : (row[1] ? String(row[1]).toUpperCase().trim() : fallbackSymbol);
+        if (!symbol || symbol === "UNKNOWN" || symbol === "SYMBOL") continue;
+
+        const rawDir = typeCol !== -1 && row[typeCol] ? String(row[typeCol]).toLowerCase() : String(row[2] || "long").toLowerCase();
+        const direction = (rawDir.includes("short") || rawDir.includes("sell")) ? "short" : "long";
+
+        const rawEntryDate = entryDateCol !== -1 ? row[entryDateCol] : (dateTimeCol !== -1 ? row[dateTimeCol] : row[3] || new Date().toISOString());
+        const rawExitDate = exitDateCol !== -1 ? row[exitDateCol] : (dateTimeCol !== -1 ? row[dateTimeCol] : row[4] || rawEntryDate);
+
+        const entryPrice = parseFloat(entryPriceCol !== -1 ? row[entryPriceCol] : (priceCol !== -1 ? row[priceCol] : row[5])) || 0;
+        const exitPrice = parseFloat(exitPriceCol !== -1 ? row[exitPriceCol] : (priceCol !== -1 ? row[priceCol] : row[6])) || entryPrice;
+        const qty = parseFloat(qtyCol !== -1 ? row[qtyCol] : row[7]) || 1;
+
+        const rowAccount = accountCol !== -1 && row[accountCol] ? String(row[accountCol]).trim() : null;
+        const targetAccount = (rowAccount && rowAccount !== "" && rowAccount.toLowerCase() !== "undefined") ? rowAccount : activeAccount;
+
+        const manualPnl = profitCol !== -1 && row[profitCol] !== "" ? parseFloat(row[profitCol]) : null;
+
+        parsedTrades.push({
+          id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
+          symbol,
+          direction,
+          entryDateTime: normalizeDateTime(rawEntryDate),
+          exitDateTime: normalizeDateTime(rawExitDate),
+          entryPrice,
+          exitPrice,
+          qty,
+          stopLoss: null,
+          fees: 0,
+          setup: setupCol !== -1 && row[setupCol] ? String(row[setupCol]).trim() : "",
+          notes: notesCol !== -1 && row[notesCol] ? String(row[notesCol]).trim() : "",
+          lessons: "",
+          screenshotUrl: "",
+          signalEntryPrice: entryPrice,
+          signalExitPrice: exitPrice,
+          accountId: targetAccount,
+          mistake: mistakeCol !== -1 && row[mistakeCol] ? String(row[mistakeCol]).trim() : "",
+          assetClass: assetClassCol !== -1 && row[assetClassCol] ? String(row[assetClassCol]).trim() : "stocks",
+          status: statusCol !== -1 && row[statusCol] ? String(row[statusCol]).trim() : "executed",
+          overridePnl: manualPnl != null,
+          manualPnl: manualPnl,
+          interventionType: "followed",
+          maxPrice: runUpCol !== -1 && row[runUpCol] !== "" ? parseFloat(row[runUpCol]) : null,
+          minPrice: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null
+        });
+      }
+    }
+
+    return parsedTrades;
   }
 }
 
