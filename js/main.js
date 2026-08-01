@@ -182,9 +182,11 @@ function setupTabRouting() {
         }
       });
 
-      // Render the newly opened tab
-      const filteredTrades = AppState.getFilteredTrades();
-      renderActiveView(filteredTrades);
+      // Render the newly opened tab after DOM reflow/repaint frame
+      requestAnimationFrame(() => {
+        const filteredTrades = AppState.getFilteredTrades();
+        renderActiveView(filteredTrades);
+      });
     });
   });
 }
