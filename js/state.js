@@ -1174,7 +1174,11 @@ class StateManager {
     const findColIdx = (headers, aliases) => {
       const norm = headers.map(h => String(h || "").toLowerCase().trim());
       for (const alias of aliases) {
-        const idx = norm.findIndex(h => h === alias || h.includes(alias));
+        const idx = norm.findIndex(h => h === alias);
+        if (idx !== -1) return idx;
+      }
+      for (const alias of aliases) {
+        const idx = norm.findIndex(h => h.includes(alias));
         if (idx !== -1) return idx;
       }
       return -1;
