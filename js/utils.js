@@ -317,11 +317,17 @@ export function getDateRange(preset, baseDate = new Date()) {
 
 export function excelSerialToDate(serial) {
   if (typeof serial !== "number" || isNaN(serial) || serial <= 0) return null;
-  const excelEpoch = new Date(Date.UTC(1899, 11, 30));
   const days = Math.floor(serial);
   const fraction = serial - days;
-  const millisecondsInDay = 86400000;
-  return new Date(excelEpoch.getTime() + days * millisecondsInDay + Math.round(fraction * millisecondsInDay));
+  const totalSeconds = Math.round(fraction * 86400);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  const baseDate = new Date(1899, 11, 30);
+  baseDate.setDate(baseDate.getDate() + days);
+  baseDate.setHours(hours, minutes, seconds, 0);
+  return baseDate;
 }
 
 export function normalizeDateTime(dateVal) {
