@@ -88,74 +88,28 @@ export function calcPnlPercent(trade) {
 }
 
 export function calcSignalPnl(trade) {
-  const qty = parseFloat(trade.qty) || 0;
-  const entry = parseFloat(trade.entryPrice) || 0;
-  const exit = parseFloat(trade.exitPrice) || 0;
-  const direction = trade.direction || "long";
-  const dirMult = direction === "long" ? 1 : -1;
-  const fees = parseFloat(trade.fees) || 0;
-  const mult = getEffectiveMultiplier(trade);
+  if (!trade) return 0;
   const type = trade.interventionType || "followed";
 
-  // 1. Discretionary trade taken with NO strategy signal
+  // 1. Followed trades (no intervention): Mechanical Strategy P&L is identical to Actual P&L
+  if ((type === "followed" || !type) && !isSkippedTrade(trade)) {
+    return calcNetPnl(trade);
+  }
+
+  // 2. Discretionary trade taken with NO strategy signal
   if (type === "manual_no_signal") {
     return 0; // Mechanical strategy rule generated $0 P&L (did not take trade)
   }
 
-  // 2. Explicit signal entry & exit prices provided
-  if (trade.signalEntryPrice != null && trade.signalExitPrice != null) {
-    const sigEntry = parseFloat(trade.signalEntryPrice);
-    const sigExit = parseFloat(trade.signalExitPrice);
-    if (!isNaN(sigEntry) && !isNaN(sigExit)) {
-      return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-    }
-  }
+  const qty = parseFloat(trade.qty) || 0;
+  const entry = parseFloat(trade.entryPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || entry;
+  const direction = String(trade.direction || "long").toLowerCase();
+  const dirMult = direction === "short" ? -1 : 1;
+  const fees = parseFloat(trade.fees) || 0;
+  const mult = getEffectiveMultiplier(trade);
 
-  // 3. Early Profit Cut (Strategy intended to hold for full move / max price reached)
-  if (type === "early_profit") {
-    let sigExit = trade.signalExitPrice ? parseFloat(trade.signalExitPrice) : null;
-    if (!sigExit || isNaN(sigExit)) {
-      if (direction === "long" && trade.maxPrice != null && parseFloat(trade.maxPrice) > exit) {
-        sigExit = parseFloat(trade.maxPrice);
-      } else if (direction === "short" && trade.minPrice != null && parseFloat(trade.minPrice) < exit) {
-        sigExit = parseFloat(trade.minPrice);
-      } else {
-        sigExit = direction === "long" ? exit * 1.02 : exit * 0.98;
-      }
-    }
-    const sigEntry = trade.signalEntryPrice ? parseFloat(trade.signalEntryPrice) : entry;
-    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-  }
-
-  // 4. Early Loss Cut (Strategy held to full stop loss or maximum drawdown)
-  if (type === "early_loss") {
-    let sigExit = trade.signalExitPrice ? parseFloat(trade.signalExitPrice) : null;
-    if (!sigExit || isNaN(sigExit)) {
-      if (trade.stopLoss != null && !isNaN(parseFloat(trade.stopLoss))) {
-        sigExit = parseFloat(trade.stopLoss);
-      } else if (direction === "long" && trade.minPrice != null && parseFloat(trade.minPrice) < exit) {
-        sigExit = parseFloat(trade.minPrice);
-      } else if (direction === "short" && trade.maxPrice != null && parseFloat(trade.maxPrice) > exit) {
-        sigExit = parseFloat(trade.maxPrice);
-      } else {
-        sigExit = direction === "long" ? exit * 0.98 : exit * 1.02;
-      }
-    }
-    const sigEntry = trade.signalEntryPrice ? parseFloat(trade.signalEntryPrice) : entry;
-    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-  }
-
-  // 5. Late Entry (Strategy entered earlier at signal price)
-  if (type === "late_entry") {
-    let sigEntry = trade.signalEntryPrice ? parseFloat(trade.signalEntryPrice) : null;
-    if (!sigEntry || isNaN(sigEntry)) {
-      sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
-    }
-    const sigExit = trade.signalExitPrice ? parseFloat(trade.signalExitPrice) : exit;
-    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-  }
-
-  // 6. Skipped Trades (Strategy executed trade, trader skipped it)
+  // 3. Skipped Trades (Strategy executed trade, trader skipped it)
   if (isSkippedTrade(trade)) {
     if (exit !== 0 && entry !== 0) {
       return (exit - entry) * qty * mult * dirMult - fees;
@@ -163,8 +117,47 @@ export function calcSignalPnl(trade) {
     return 0;
   }
 
-  // Default: Followed strategy rules
-  return (exit - entry) * qty * mult * dirMult - fees;
+  let sigEntry = trade.signalEntryPrice != null && !isNaN(parseFloat(trade.signalEntryPrice))
+    ? parseFloat(trade.signalEntryPrice)
+    : entry;
+  let sigExit = trade.signalExitPrice != null && !isNaN(parseFloat(trade.signalExitPrice))
+    ? parseFloat(trade.signalExitPrice)
+    : exit;
+
+  if (type === "early_profit" && (trade.signalExitPrice == null || isNaN(parseFloat(trade.signalExitPrice)))) {
+    if (direction === "long" && trade.maxPrice != null && !isNaN(parseFloat(trade.maxPrice)) && parseFloat(trade.maxPrice) > exit) {
+      sigExit = parseFloat(trade.maxPrice);
+    } else if (direction === "short" && trade.minPrice != null && !isNaN(parseFloat(trade.minPrice)) && parseFloat(trade.minPrice) < exit) {
+      sigExit = parseFloat(trade.minPrice);
+    } else {
+      sigExit = direction === "long" ? exit * 1.02 : exit * 0.98;
+    }
+  } else if (type === "early_loss" && (trade.signalExitPrice == null || isNaN(parseFloat(trade.signalExitPrice)))) {
+    if (trade.stopLoss != null && !isNaN(parseFloat(trade.stopLoss))) {
+      sigExit = parseFloat(trade.stopLoss);
+    } else if (direction === "long" && trade.minPrice != null && !isNaN(parseFloat(trade.minPrice)) && parseFloat(trade.minPrice) < exit) {
+      sigExit = parseFloat(trade.minPrice);
+    } else if (direction === "short" && trade.maxPrice != null && !isNaN(parseFloat(trade.maxPrice)) && parseFloat(trade.maxPrice) > exit) {
+      sigExit = parseFloat(trade.maxPrice);
+    } else {
+      sigExit = direction === "long" ? exit * 0.98 : exit * 1.02;
+    }
+  } else if (type === "late_entry" && (trade.signalEntryPrice == null || isNaN(parseFloat(trade.signalEntryPrice)))) {
+    sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
+  }
+
+  const calculatedSignalPnl = (sigExit - sigEntry) * qty * mult * dirMult - fees;
+
+  // If overridePnl is set for this trade, scale signal PnL by the manualPnl ratio
+  if (trade.overridePnl && trade.manualPnl != null && !isNaN(parseFloat(trade.manualPnl))) {
+    const rawActual = (exit - entry) * qty * mult * dirMult - fees;
+    if (rawActual !== 0) {
+      const ratio = parseFloat(trade.manualPnl) / rawActual;
+      return calculatedSignalPnl * ratio;
+    }
+  }
+
+  return calculatedSignalPnl;
 }
 
 export function calcPriceDiff(p1, p2) {
@@ -598,7 +591,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   }
 
   const actualCount = trades.filter(t => isExecutedTrade(t)).length;
-  const strategyCount = trades.length;
+  const strategyCount = trades.filter(t => t.interventionType !== "manual_no_signal").length;
 
   const actualWinRate = actualCount > 0 ? (actualWins / actualCount) * 100 : 0;
   const strategyWinRate = strategyCount > 0 ? (strategyWins / strategyCount) * 100 : 0;
