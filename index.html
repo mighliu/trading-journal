@@ -83,9 +83,19 @@
           </div>
         </div>
 
-        <button id="importBtn" class="btn btn-secondary">
-          <i data-lucide="upload"></i> Import
-        </button>
+        <div class="dropdown">
+          <button class="btn btn-secondary">
+            <i data-lucide="upload"></i> Import <i data-lucide="chevron-down" style="width: 14px; height: 14px;"></i>
+          </button>
+          <div class="dropdown-content">
+            <button type="button" class="broker-import-btn" data-broker="auto"><i data-lucide="sparkles"></i> Auto-Detect / Generic</button>
+            <button type="button" class="broker-import-btn" data-broker="tradovate"><i data-lucide="activity"></i> Tradovate</button>
+            <button type="button" class="broker-import-btn" data-broker="rithmic"><i data-lucide="zap"></i> Rithmic / NinjaTrader</button>
+            <button type="button" class="broker-import-btn" data-broker="ibkr"><i data-lucide="globe"></i> Interactive Brokers</button>
+            <button type="button" class="broker-import-btn" data-broker="tradestation"><i data-lucide="trending-up"></i> TradeStation</button>
+            <button type="button" class="broker-import-btn" data-broker="metatrader"><i data-lucide="layers"></i> MetaTrader 4 / 5</button>
+          </div>
+        </div>
         <input type="file" id="importFileInput" class="hidden" accept=".json,.csv,.xlsx">
 
         <button id="keyboardShortcutsBtn" class="btn-icon" title="Keyboard Shortcuts (?)"
@@ -420,6 +430,19 @@
             </table>
           </div>
         </div>
+
+        <!-- Best & Worst Trading Days Summary Card -->
+        <div class="chart-card chart-card-full" style="margin-top: 24px;">
+          <div class="chart-header">
+            <h3 class="chart-title"><i data-lucide="trophy" style="color: #f59e0b"></i> Best &amp; Worst Trading Days</h3>
+            <span class="muted" style="font-size: 0.75rem;">Key Performance Sessions</span>
+          </div>
+          <div class="card-body" style="padding: 16px;">
+            <div id="bestWorstDaysContainer" class="best-worst-grid">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ==================== TAB CONTENT: TRADE LOG ==================== -->
@@ -524,59 +547,73 @@
       <div id="analyticsTabContent" class="tab-content hidden">
 
         <!-- ── Group 1: Performance Breakdown ──────────────────────────────── -->
-        <div style="display:flex;align-items:center;gap:12px;margin:0 0 14px;">
-          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Performance Breakdown</span>
+        <div class="collapsible-group-header" data-target="groupAnalyticsPerf">
+          <i data-lucide="chevron-down" class="chevron-icon"></i>
+          <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Performance Breakdown</span>
           <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
         </div>
-        <div class="analytics-grid" style="margin-bottom:28px;">
-          <!-- P&L by Setup Tag -->
-          <div class="chart-card">
+        <div id="groupAnalyticsPerf">
+          <!-- Setup Tag Leaderboard Card -->
+          <div class="chart-card chart-card-full" style="margin-bottom: 24px;">
             <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="tag"></i> P&L by Setup Tag <span class="tooltip-trigger" data-tooltip="Ranks setups by net performance to identify your high-expectancy setups."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              <h3 class="chart-title"><i data-lucide="award" style="color: #f59e0b"></i> Setup Tag Performance Leaderboard <span class="tooltip-trigger" data-tooltip="Ranked breakdown of setups by Expectancy, Win Rate, Profit Factor, and Total Net P&L."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
-            <div class="chart-container-medium"><canvas id="setupTagChart"></canvas></div>
+            <div class="card-body" style="padding: 16px; overflow-x: auto;">
+              <div id="setupLeaderboardContainer">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
           </div>
-          <!-- Top Symbols -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="bar-chart-3"></i> Top Symbols (Volume vs Win Rate) <span class="tooltip-trigger" data-tooltip="Plots your most traded symbols: total trade count (bars) and their respective win rates (line)."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+          <div class="analytics-grid" style="margin-bottom:28px;">
+            <!-- P&L by Setup Tag -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="tag"></i> P&L by Setup Tag <span class="tooltip-trigger" data-tooltip="Ranks setups by net performance to identify your high-expectancy setups."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="setupTagChart"></canvas></div>
             </div>
-            <div class="chart-container-medium"><canvas id="symbolChart"></canvas></div>
-          </div>
-          <!-- Asset Class -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="layers" style="color: var(--accent)"></i> P&L by Asset Class <span class="tooltip-trigger" data-tooltip="Compares net performance across Stocks, Options, Futures, Crypto, and Forex."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+            <!-- Top Symbols -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="bar-chart-3"></i> Top Symbols (Volume vs Win Rate) <span class="tooltip-trigger" data-tooltip="Plots your most traded symbols: total trade count (bars) and their respective win rates (line)."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="symbolChart"></canvas></div>
             </div>
-            <div class="chart-container-medium"><canvas id="assetClassChart"></canvas></div>
-          </div>
-          <!-- Day of Week -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="calendar-days"></i> P&L by Day of the Week <span class="tooltip-trigger" data-tooltip="Shows your net P&L accumulated on each day of the week to analyze which days are most profitable."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+            <!-- Asset Class -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="layers" style="color: var(--accent)"></i> P&L by Asset Class <span class="tooltip-trigger" data-tooltip="Compares net performance across Stocks, Options, Futures, Crypto, and Forex."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="assetClassChart"></canvas></div>
             </div>
-            <div class="chart-container-medium"><canvas id="dayOfWeekChart"></canvas></div>
-          </div>
-          <!-- Behavioral Mistakes -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="skull" style="color: var(--loss)"></i> P&L by Behavioral Mistake <span class="tooltip-trigger" data-tooltip="Tracks the net financial impact of psychological mistakes (e.g. FOMO, Revenge Trading)."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+            <!-- Day of Week -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="calendar-days"></i> P&L by Day of the Week <span class="tooltip-trigger" data-tooltip="Shows your net P&L accumulated on each day of the week to analyze which days are most profitable."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="dayOfWeekChart"></canvas></div>
             </div>
-            <div class="chart-container-medium"><canvas id="mistakeChart"></canvas></div>
-          </div>
-          <!-- Hour of Entry -->
-          <div class="chart-card">
-            <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="clock" style="color: var(--accent)"></i> Net P&L by Hour of Entry <span class="tooltip-trigger" data-tooltip="Distributes net P&L by the hour of entry to locate your peak operating hours during the day."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+            <!-- Behavioral Mistakes -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="skull" style="color: var(--loss)"></i> P&L by Behavioral Mistake <span class="tooltip-trigger" data-tooltip="Tracks the net financial impact of psychological mistakes (e.g. FOMO, Revenge Trading)."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="mistakeChart"></canvas></div>
             </div>
-            <div class="chart-container-medium"><canvas id="hourPnlChart"></canvas></div>
-          </div>
-          <!-- Win/Loss Distribution -->
-          <div class="chart-card" style="grid-column: span 2;">
-            <div class="chart-header">
-              <h3 class="chart-title"><i data-lucide="bar-chart" style="color: #10b981"></i> Win/Loss Size Distribution <span class="tooltip-trigger" data-tooltip="Groups trade outcomes into size ranges to check if you are keeping losses small and letting wins run."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+            <!-- Hour of Entry -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="clock" style="color: var(--accent)"></i> Net P&L by Hour of Entry <span class="tooltip-trigger" data-tooltip="Distributes net P&L by the hour of entry to locate your peak operating hours during the day."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="hourPnlChart"></canvas></div>
             </div>
-            <div class="chart-container-medium"><canvas id="distributionChart"></canvas></div>
+            <!-- Win/Loss Distribution -->
+            <div class="chart-card" style="grid-column: span 2;">
+              <div class="chart-header">
+                <h3 class="chart-title"><i data-lucide="bar-chart" style="color: #10b981"></i> Win/Loss Size Distribution <span class="tooltip-trigger" data-tooltip="Groups trade outcomes into size ranges to check if you are keeping losses small and letting wins run."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              </div>
+              <div class="chart-container-medium"><canvas id="distributionChart"></canvas></div>
+            </div>
           </div>
         </div>
 
@@ -709,18 +746,32 @@
         </div>
 
         <!-- ── Group 5: Session Time Heatmap ────────────────────────────── -->
-        <div style="display:flex;align-items:center;gap:12px;margin:0 0 14px;">
-          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Session Performance Heatmap</span>
+        <div class="collapsible-group-header" data-target="groupAnalyticsSession">
+          <i data-lucide="chevron-down" class="chevron-icon"></i>
+          <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Session Performance Heatmap</span>
           <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
         </div>
-        <div class="chart-card" style="margin-bottom: 24px;">
-          <div class="chart-header">
-            <h3 class="chart-title">
-              <i data-lucide="grid" style="color: #a78bfa"></i> Time-of-Day × Day-of-Week P&L Heatmap
-              <span class="tooltip-trigger" data-tooltip="Shows your average P&L intensity for each hour of the day and day of the week. Green = profitable time slots, Red = losing time slots. Darker shades = more extreme performance."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span>
-            </h3>
+        <div id="groupAnalyticsSession">
+          <div class="chart-card" style="margin-bottom: 24px;">
+            <div class="chart-header">
+              <h3 class="chart-title">
+                <i data-lucide="grid" style="color: #a78bfa"></i> Time-of-Day × Day-of-Week P&L Heatmap
+                <span class="tooltip-trigger" data-tooltip="Shows your average P&L intensity for each hour of the day and day of the week. Green = profitable time slots, Red = losing time slots. Darker shades = more extreme performance."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span>
+              </h3>
+            </div>
+            <div id="sessionHeatmapContainer" style="overflow-x: auto; padding: 12px 0 4px;"></div>
           </div>
-          <div id="sessionHeatmapContainer" style="overflow-x: auto; padding: 12px 0 4px;"></div>
+
+          <!-- Symbol x Session Time-of-Day Table -->
+          <div class="chart-card" style="margin-bottom: 24px;">
+            <div class="chart-header">
+              <h3 class="chart-title">
+                <i data-lucide="table" style="color: #38bdf8"></i> Symbol × Time-of-Day Performance Matrix
+                <span class="tooltip-trigger" data-tooltip="Correlates specific traded symbols against session hours (9am-5pm) to reveal which assets perform best during specific market hours."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span>
+              </h3>
+            </div>
+            <div id="symbolSessionContainer" style="overflow-x: auto; padding: 12px 0 4px;"></div>
+          </div>
         </div>
 
       </div>

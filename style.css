@@ -2169,6 +2169,140 @@ body.light-theme .live-math-bottom {
 }
 
 /* ==========================================================================
+   5 NEW FEATURES STYLES
+   ============================================================ */
+
+/* Collapsible Section Headers */
+.collapsible-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 8px;
+  margin: 20px 0 12px 0;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.collapsible-group-header:hover {
+  background: var(--bg-card-hover);
+}
+.collapsible-group-header .chevron-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+.collapsible-group-header.collapsed .chevron-icon {
+  transform: rotate(-90deg);
+}
+
+/* Best & Worst Days Card */
+.best-worst-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .best-worst-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.day-rank-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: background 0.15s ease;
+}
+.day-rank-card:hover {
+  background: var(--bg-card-hover);
+}
+.day-rank-badge {
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  margin-right: 8px;
+}
+.best-day-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.worst-day-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Setup Leaderboard Table */
+.setup-leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.setup-leaderboard-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.setup-leaderboard-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.setup-leaderboard-table tr:last-child td {
+  border-bottom: none;
+}
+.setup-leaderboard-table tr:hover td {
+  background: var(--bg-card-hover);
+}
+
+/* Symbol x Session Heatmap Table */
+.symbol-session-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.symbol-session-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78125rem;
+  text-align: center;
+}
+.symbol-session-table th {
+  padding: 8px 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.symbol-session-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-weight: 600;
+  transition: opacity 0.15s ease;
+}
+.symbol-session-table td.symbol-col {
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+/* ==========================================================================
    FEATURE: Note Templates Pills
    ========================================================================== */
 .note-template-pills {

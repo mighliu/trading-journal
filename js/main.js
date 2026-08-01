@@ -11,7 +11,9 @@ import {
   renderRiskTab,
   renderAnalyticsTab,
   renderEdgeInsights,
-  renderPsychologyAnalyticsCard
+  renderPsychologyAnalyticsCard,
+  renderBestWorstDaysCard,
+  renderSetupLeaderboard
 } from './ui.js';
 import { 
   renderCalendar, 
@@ -49,6 +51,7 @@ import {
   renderMonteCarloChart,
   renderTrailingDrawdownChart,
   renderSessionHeatmap,
+  renderSymbolSessionTable,
   destroyAllCharts
 } from './charts.js';
 import { compressImage, hasSevereDeviation, calcNetPnl } from './utils.js';
@@ -89,6 +92,9 @@ async function init() {
 
   // Setup note templates
   setupNoteTemplates();
+
+  // Setup collapsible sections
+  setupCollapsibleSections();
 }
 
 function handleStateChange() {
@@ -212,6 +218,7 @@ function renderActiveView(filteredTrades) {
     renderEdgeInsights();
     renderEquityCurve(filteredTrades, AppState.settings.startingBalance);
     renderDailyPnlChart(filteredTrades);
+    renderBestWorstDaysCard(filteredTrades);
   } else if (currentTab === "tradeLog") {
     renderTradeLog(filteredTrades, 1);
   } else if (currentTab === "calendar") {
@@ -240,6 +247,8 @@ function renderActiveView(filteredTrades) {
     renderTradeSequenceChart(filteredTrades);
     renderPsychologyAnalyticsCard();
     renderSessionHeatmap(filteredTrades);
+    renderSymbolSessionTable(filteredTrades);
+    renderSetupLeaderboard(filteredTrades);
 
   } else if (currentTab === "intervention") {
     const backupStatus = AppState.activeFilters.status;
@@ -318,13 +327,17 @@ function setupActionButtons() {
     });
   }
 
-  // Import button trigger
-  const importBtn = document.getElementById("importBtn");
+  // Import button & Broker Presets trigger
+  let selectedBrokerKey = "auto";
   const importFileInput = document.getElementById("importFileInput");
+  const brokerImportBtns = document.querySelectorAll(".broker-import-btn");
 
-  if (importBtn && importFileInput) {
-    importBtn.addEventListener("click", () => {
-      importFileInput.click();
+  if (importFileInput) {
+    brokerImportBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        selectedBrokerKey = btn.dataset.broker || "auto";
+        importFileInput.click();
+      });
     });
 
     importFileInput.addEventListener("change", (e) => {
@@ -355,12 +368,12 @@ function setupActionButtons() {
           .then(res => handleImportResult(res, "JSON"))
           .catch(err => showToast(err.message, "error"));
       } else if (ext === "csv") {
-        AppState.importCSV(file)
-          .then(res => handleImportResult(res, "CSV"))
+        AppState.importCSV(file, selectedBrokerKey)
+          .then(res => handleImportResult(res, `CSV (${selectedBrokerKey.toUpperCase()})`))
           .catch(err => showToast(err.message, "error"));
       } else if (ext === "xlsx" || ext === "xls") {
-        AppState.importXLSX(file)
-          .then(res => handleImportResult(res, "Excel"))
+        AppState.importXLSX(file, selectedBrokerKey)
+          .then(res => handleImportResult(res, `Excel (${selectedBrokerKey.toUpperCase()})`))
           .catch(err => showToast(err.message, "error"));
       } else {
         showToast("Unsupported file format. Please select a .json, .csv, or .xlsx file.", "error");
@@ -904,3 +917,43 @@ function setupScreenshotDropzones() {
     });
   }
 }
+
+// ============================================================
+// FEATURE: Collapsible Section Headers
+// ============================================================
+function setupCollapsibleSections() {
+  document.addEventListener("click", (e) => {
+    const header = e.target.closest(".collapsible-group-header");
+    if (!header) return;
+
+    const targetId = header.dataset.target;
+    if (!targetId) return;
+
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    header.classList.toggle("collapsed");
+    targetEl.classList.toggle("hidden");
+
+    // Save preference
+    try {
+      const collapsedStates = JSON.parse(localStorage.getItem("tradeflow_collapsed_sections") || "{}");
+      collapsedStates[targetId] = targetEl.classList.contains("hidden");
+      localStorage.setItem("tradeflow_collapsed_sections", JSON.stringify(collapsedStates));
+    } catch (err) {}
+  });
+
+  // Restore saved states on initial load
+  try {
+    const collapsedStates = JSON.parse(localStorage.getItem("tradeflow_collapsed_sections") || "{}");
+    Object.entries(collapsedStates).forEach(([targetId, isCollapsed]) => {
+      if (isCollapsed) {
+        const header = document.querySelector(`.collapsible-group-header[data-target="${targetId}"]`);
+        const targetEl = document.getElementById(targetId);
+        if (header) header.classList.add("collapsed");
+        if (targetEl) targetEl.classList.add("hidden");
+      }
+    });
+  } catch (err) {}
+}
+

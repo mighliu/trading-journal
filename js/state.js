@@ -991,7 +991,66 @@ class StateManager {
     });
   }
 
-  importCSV(file) {
+export const BROKER_PRESETS = {
+  auto: null,
+  tradovate: {
+    symbol: ["contract", "symbol", "instrument", "product"],
+    direction: ["buy/sell", "action", "b/s", "side", "type"],
+    entryPrice: ["avg fill price", "price", "buy price", "fill price", "price usd"],
+    exitPrice: ["sell price", "close price", "exit price"],
+    qty: ["qty", "contracts", "size", "amount"],
+    entryDate: ["timestamp", "fill time", "order time", "date and time", "time"],
+    exitDate: ["close time", "exit time", "closed"],
+    pnl: ["p/l", "realized p/l", "net p/l", "profit usd", "net pnl"],
+    fees: ["commissions", "fees", "comm"]
+  },
+  rithmic: {
+    symbol: ["instrument", "symbol", "contract"],
+    direction: ["buy/sell", "market pos.", "type", "side", "direction"],
+    entryPrice: ["entry price", "avg fill", "open price"],
+    exitPrice: ["exit price", "close price"],
+    qty: ["qty", "size", "contracts"],
+    entryDate: ["entry time", "open time", "time"],
+    exitDate: ["exit time", "close time"],
+    pnl: ["pnl", "net pnl", "profit", "realized pnl"],
+    fees: ["commission", "fee", "comm"]
+  },
+  ibkr: {
+    symbol: ["symbol", "financial instrument"],
+    direction: ["buy/sell", "side", "code"],
+    entryPrice: ["t. price", "trade price", "price"],
+    exitPrice: ["close price"],
+    qty: ["quantity", "qty", "shares"],
+    entryDate: ["date/time", "trade date", "date"],
+    exitDate: ["close date"],
+    pnl: ["realized pnl", "fifo pnl", "pnl"],
+    fees: ["comm/fee", "commission"]
+  },
+  tradestation: {
+    symbol: ["symbol", "asset"],
+    direction: ["type", "side"],
+    entryPrice: ["price", "entry price"],
+    exitPrice: ["exit price"],
+    qty: ["qty", "shares", "contracts"],
+    entryDate: ["entry time", "date"],
+    exitDate: ["exit time"],
+    pnl: ["total net profit", "p/l", "net profit"],
+    fees: ["commission", "fees"]
+  },
+  metatrader: {
+    symbol: ["item", "symbol"],
+    direction: ["type", "side"],
+    entryPrice: ["open price", "price"],
+    exitPrice: ["close price"],
+    qty: ["size", "lots", "volume"],
+    entryDate: ["open time", "time"],
+    exitDate: ["close time"],
+    pnl: ["profit", "pnl"],
+    fees: ["commission", "taxes", "swap"]
+  }
+};
+
+  importCSV(file, brokerKey = "auto") {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -1029,7 +1088,16 @@ class StateManager {
           };
 
           const headerRow = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim());
-          const getColIdx = (name) => headerRow.findIndex(h => h.includes(name));
+          const preset = BROKER_PRESETS[brokerKey];
+
+          const getColIdx = (fieldName, defaultAliases = [fieldName]) => {
+            const aliases = (preset && preset[fieldName]) ? preset[fieldName] : defaultAliases;
+            for (const alias of aliases) {
+              const idx = headerRow.findIndex(h => h.includes(alias));
+              if (idx !== -1) return idx;
+            }
+            return -1;
+          };
 
           const dataRows = lines.slice(1);
           let addedCount = 0;

@@ -4234,3 +4234,108 @@ export function renderSessionHeatmap(trades) {
   container.innerHTML = html;
 }
 
+// ============================================================
+// FEATURE: Symbol x Session Time-of-Day Performance Matrix
+// ============================================================
+export function renderSymbolSessionTable(trades) {
+  const container = document.getElementById("symbolSessionContainer");
+  if (!container) return;
+
+  const executed = trades.filter(t => isExecutedTrade(t));
+  if (executed.length === 0) {
+    container.innerHTML = `<span class="muted" style="font-size: 0.8125rem;">No executed trades logged yet.</span>`;
+    return;
+  }
+
+  // Count top symbols
+  const symCounts = {};
+  for (const t of executed) {
+    if (!t.symbol) continue;
+    const sym = t.symbol.toUpperCase().trim();
+    symCounts[sym] = (symCounts[sym] || 0) + 1;
+  }
+
+  const topSymbols = Object.keys(symCounts)
+    .sort((a, b) => symCounts[b] - symCounts[a])
+    .slice(0, 8); // Top 8 symbols
+
+  if (topSymbols.length === 0) {
+    container.innerHTML = `<span class="muted" style="font-size: 0.8125rem;">No symbol data available.</span>`;
+    return;
+  }
+
+  const hours = [9, 10, 11, 12, 13, 14, 15, 16, 17];
+  const hourLabels = ["9am", "10am", "11am", "12pm", "1pm", "2pm", "3pm", "4pm", "5pm"];
+
+  // Grid: symbol x hour => { total, count, wins }
+  const grid = {};
+  for (const sym of topSymbols) {
+    grid[sym] = Array.from({ length: hours.length }, () => ({ total: 0, count: 0, wins: 0 }));
+  }
+
+  let maxAbs = 0;
+  for (const t of executed) {
+    if (!t.symbol || !t.entryDateTime) continue;
+    const sym = t.symbol.toUpperCase().trim();
+    if (!grid[sym]) continue;
+
+    const dt = new Date(t.entryDateTime);
+    const hr = dt.getHours();
+    const hIdx = hours.indexOf(hr);
+    if (hIdx === -1) continue;
+
+    const pnl = calcNetPnl(t);
+    grid[sym][hIdx].total += pnl;
+    grid[sym][hIdx].count++;
+    if (pnl > 0) grid[sym][hIdx].wins++;
+
+    const avg = Math.abs(grid[sym][hIdx].total / grid[sym][hIdx].count);
+    if (avg > maxAbs) maxAbs = avg;
+  }
+  if (maxAbs === 0) maxAbs = 1;
+
+  const isLight = document.body.classList.contains("light-theme");
+
+  let html = `<div class="symbol-session-table-wrapper"><table class="symbol-session-table"><thead><tr><th class="symbol-col">Symbol</th>`;
+  for (const hl of hourLabels) html += `<th>${hl}</th>`;
+  html += `</tr></thead><tbody>`;
+
+  for (const sym of topSymbols) {
+    html += `<tr><td class="symbol-col">${sym}</td>`;
+    for (let hIdx = 0; hIdx < hours.length; hIdx++) {
+      const { total, count, wins } = grid[sym][hIdx];
+      if (count === 0) {
+        html += `<td style="background: ${isLight ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.02)"}; color: var(--text-muted);">
+          <span style="font-size: 0.75rem; opacity: 0.4;">—</span>
+        </td>`;
+      } else {
+        const avg = total / count;
+        const intensity = Math.min(Math.abs(avg) / maxAbs, 1);
+        const isProfit = avg >= 0;
+        let bg, textColor;
+        if (isProfit) {
+          const alpha = 0.12 + intensity * 0.65;
+          bg = `rgba(16, 185, 129, ${alpha.toFixed(2)})`;
+          textColor = intensity > 0.5 ? "#ffffff" : "#34d399";
+        } else {
+          const alpha = 0.12 + intensity * 0.65;
+          bg = `rgba(239, 68, 68, ${alpha.toFixed(2)})`;
+          textColor = intensity > 0.5 ? "#ffffff" : "#f87171";
+        }
+        const avgStr = avg >= 0 ? `+$${Math.round(avg)}` : `-$${Math.abs(Math.round(avg))}`;
+        const wr = Math.round((wins / count) * 100);
+        const title = `${sym} @ ${hourLabels[hIdx]} | Avg: ${avgStr} | ${count} trade${count !== 1 ? "s" : ""} | WR: ${wr}%`;
+        html += `<td style="background: ${bg}; color: ${textColor};" title="${title}">
+          <span style="display: block; font-size: 0.8125rem;">${avgStr}</span>
+          <span style="display: block; font-size: 0.7rem; opacity: 0.85;">${count}t · ${wr}%</span>
+        </td>`;
+      }
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  container.innerHTML = html;
+}
+
+
