@@ -273,9 +273,9 @@ function renderActiveView(filteredTrades) {
     renderDrawdownScatterChart(tradesForRisk, AppState.settings.startingBalance);
     // Auto-run trailing drawdown with current sim settings
     const simAccountSize = parseFloat(document.getElementById("simAccountSize")?.value) || AppState.settings.startingBalance || 50000;
-    const simMaxDDPct = parseFloat(document.getElementById("simMaxDrawdownPct")?.value) || 5;
-    const simStyle = document.getElementById("simDrawdownStyle")?.value || "trailing_from_peak";
-    renderTrailingDrawdownChart(tradesForRisk, simAccountSize, simMaxDDPct, simStyle);
+    const simMaxDDAmt = parseFloat(document.getElementById("simMaxDrawdownAmt")?.value) || 2500;
+    const simStyle = document.getElementById("simDrawdownStyle")?.value || "trailing_capped";
+    renderTrailingDrawdownChart(tradesForRisk, simAccountSize, simMaxDDAmt, simStyle);
   }
 }
 
@@ -863,9 +863,9 @@ function setupScreenshotDropzones() {
       const tradesForRisk = AppState.getFilteredTrades();
       AppState.activeFilters.status = backupStatus;
       const simAccountSize = parseFloat(document.getElementById("simAccountSize")?.value) || 50000;
-      const simMaxDDPct = parseFloat(document.getElementById("simMaxDrawdownPct")?.value) || 5;
-      const simStyle = document.getElementById("simDrawdownStyle")?.value || "trailing_from_peak";
-      renderTrailingDrawdownChart(tradesForRisk, simAccountSize, simMaxDDPct, simStyle);
+      const simMaxDDAmt = parseFloat(document.getElementById("simMaxDrawdownAmt")?.value) || 2500;
+      const simStyle = document.getElementById("simDrawdownStyle")?.value || "trailing_capped";
+      renderTrailingDrawdownChart(tradesForRisk, simAccountSize, simMaxDDAmt, simStyle);
       showToast("Prop firm trailing drawdown simulation updated!", "info");
     });
   }

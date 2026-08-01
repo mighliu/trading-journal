@@ -3964,7 +3964,7 @@ export function renderMonteCarloChart(trades, startingBalance = 25000) {
 // ============================================================
 // FEATURE: Trailing Drawdown Simulator (Prop Firm)
 // ============================================================
-export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDrawdownPct = 5, drawdownStyle = "trailing_from_peak") {
+export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDrawdownAmount = 2500, drawdownStyle = "trailing_capped") {
   const canvasId = "trailingDrawdownChart";
   destroyChart(canvasId);
   const canvas = document.getElementById(canvasId);
@@ -3979,14 +3979,14 @@ export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDraw
     return;
   }
 
-  const maxDDAmount = accountSize * (maxDrawdownPct / 100);
+  const maxDDAmount = Math.max(1, maxDrawdownAmount);
 
   let equity = accountSize;
   let peak = accountSize;
   let breachFloor = accountSize - maxDDAmount;
   let breachEvents = 0;
   let daysSafe = 0;
-  let closestBreachPct = Infinity; // track % distance from breach
+  let closestBuffer = Infinity;
 
   const equityPath = [accountSize];
   const floorPath = [breachFloor];
@@ -3995,21 +3995,39 @@ export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDraw
 
   for (let i = 0; i < executed.length; i++) {
     const t = executed[i];
+    const equityBefore = equity;
     const pnl = calcNetPnl(t);
     equity += pnl;
 
-    if (drawdownStyle === "trailing_from_peak") {
-      if (equity > peak) {
-        peak = equity;
-        breachFloor = peak - maxDDAmount;
+    // Determine peak based on style
+    if (drawdownStyle === "trailing_intraday") {
+      let intradayPeakPnl = Math.max(0, pnl);
+      if (t.maxPrice && t.entryPrice && t.qty && t.direction === "long") {
+        intradayPeakPnl = Math.max(intradayPeakPnl, (t.maxPrice - t.entryPrice) * t.qty);
+      } else if (t.minPrice && t.entryPrice && t.qty && t.direction === "short") {
+        intradayPeakPnl = Math.max(intradayPeakPnl, (t.entryPrice - t.minPrice) * t.qty);
       }
+      const intradayPeak = equityBefore + intradayPeakPnl;
+      if (intradayPeak > peak) peak = intradayPeak;
+      if (equity > peak) peak = equity;
+    } else if (drawdownStyle === "trailing_capped" || drawdownStyle === "trailing_uncapped") {
+      if (equity > peak) peak = equity;
+    }
+
+    // Determine floor based on style
+    if (drawdownStyle === "trailing_capped" || drawdownStyle === "trailing_intraday") {
+      // Prop firm rule: Floor trails up with peak, but LOCKS at initial starting balance
+      breachFloor = Math.min(peak - maxDDAmount, accountSize);
+    } else if (drawdownStyle === "trailing_uncapped") {
+      // Trails peak infinitely
+      breachFloor = peak - maxDDAmount;
     } else {
-      // Fixed from start — floor never moves
+      // Fixed static floor
       breachFloor = accountSize - maxDDAmount;
     }
 
-    const distancePct = ((equity - breachFloor) / accountSize) * 100;
-    if (distancePct < closestBreachPct) closestBreachPct = distancePct;
+    const buffer = equity - breachFloor;
+    if (buffer < closestBuffer) closestBuffer = buffer;
 
     if (equity <= breachFloor) {
       breachEvents++;
@@ -4025,9 +4043,10 @@ export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDraw
     floorPath.push(breachFloor);
   }
 
-  // Update stats bar
+  // Update stats bar UI
   const statusEl = document.getElementById("tsimStatus");
-  const closestEl = document.getElementById("tsimClosestBreach");
+  const floorEl = document.getElementById("tsimFinalFloor");
+  const bufferEl = document.getElementById("tsimBuffer");
   const daysSafeEl = document.getElementById("tsimDaysSafe");
   const breachEventsEl = document.getElementById("tsimBreachEvents");
 
@@ -4036,21 +4055,29 @@ export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDraw
     statusEl.textContent = passed ? "✅ PASSED" : "❌ BREACHED";
     statusEl.style.color = passed ? "var(--profit)" : "var(--loss)";
   }
-  if (closestEl) {
-    const pctText = closestBreachPct === Infinity ? "--" : `${closestBreachPct.toFixed(2)}%`;
-    closestEl.textContent = pctText;
+  if (floorEl) {
+    const isLocked = breachFloor >= accountSize && (drawdownStyle === "trailing_capped" || drawdownStyle === "trailing_intraday");
+    floorEl.textContent = `$${Math.round(breachFloor).toLocaleString()}${isLocked ? " (Locked at Start)" : ""}`;
   }
-  if (daysSafeEl) daysSafeEl.textContent = `${daysSafe} trades`;
-  if (breachEventsEl) breachEventsEl.textContent = breachEvents > 0 ? `${breachEvents} breach(es)` : "None";
+  if (bufferEl) {
+    const finalBuffer = equity - breachFloor;
+    bufferEl.textContent = `$${Math.round(finalBuffer).toLocaleString()}`;
+    bufferEl.style.color = finalBuffer > 0 ? "var(--profit)" : "var(--loss)";
+  }
+  if (daysSafeEl) daysSafeEl.textContent = `${daysSafe} / ${executed.length} trades`;
+  if (breachEventsEl) {
+    breachEventsEl.textContent = breachEvents > 0 ? `${breachEvents} breach(es)` : "0 breaches";
+    breachEventsEl.style.color = breachEvents > 0 ? "var(--loss)" : "var(--profit)";
+  }
 
-  // Chart
+  // Chart configuration
   chartInstances[canvasId] = new Chart(canvas, {
     type: "line",
     data: {
       labels,
       datasets: [
         {
-          label: "Simulated Equity",
+          label: "Account Equity",
           data: equityPath,
           borderColor: "#38bdf8",
           backgroundColor: "rgba(56, 189, 248, 0.08)",
@@ -4104,8 +4131,7 @@ export function renderTrailingDrawdownChart(trades, accountSize = 50000, maxDraw
               return `${ctx.dataset.label}: $${Math.round(ctx.parsed.y).toLocaleString()}`;
             }
           }
-        },
-        annotation: undefined
+        }
       },
       scales: {
         x: {
