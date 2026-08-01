@@ -872,6 +872,7 @@ class StateManager {
           if (!Array.isArray(imported)) {
             return reject(new Error("Imported file must contain an array of trades."));
           }
+          const activeAccount = this.settings.currentAccount || "Personal";
           const validated = imported.map(t => ({
             id: t.id || "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
             symbol: (t.symbol || "UNKNOWN").toUpperCase(),
@@ -889,7 +890,7 @@ class StateManager {
             screenshotUrl: (t.screenshotUrl || "").trim(),
             signalEntryPrice: t.signalEntryPrice ? parseFloat(t.signalEntryPrice) : null,
             signalExitPrice: t.signalExitPrice ? parseFloat(t.signalExitPrice) : null,
-            accountId: t.accountId || "Personal",
+            accountId: t.accountId || activeAccount,
             mistake: (t.mistake || "").trim(),
             assetClass: t.assetClass || "stocks",
             status: t.status || "executed",
@@ -939,6 +940,8 @@ class StateManager {
             return reject(new Error("CSV file must contain a header row and at least one data row."));
           }
 
+          const activeAccount = this.settings.currentAccount || "Personal";
+
           const parseCsvLine = (line) => {
             const result = [];
             let start = 0;
@@ -974,32 +977,58 @@ class StateManager {
             const cols = parseCsvLine(rowStr);
             if (cols.length < 3) return;
 
-            const symbol = (cols[getColIdx("symbol")] || cols[1] || "UNKNOWN").toUpperCase();
-            const direction = (cols[getColIdx("direction")] || cols[2] || "long").toLowerCase() === "short" ? "short" : "long";
+            const symbolCol = getColIdx("symbol");
+            const symbol = (symbolCol !== -1 ? cols[symbolCol] : cols[1] || "UNKNOWN").toUpperCase().trim();
+            if (!symbol || symbol === "UNKNOWN" || symbol === "SYMBOL") return;
 
-            const rawEntryDate = cols[getColIdx("entry date")] || cols[3] || new Date().toISOString();
-            const rawExitDate = cols[getColIdx("exit date")] || cols[4] || new Date().toISOString();
+            const dirCol = getColIdx("direction");
+            const direction = (dirCol !== -1 ? cols[dirCol] : cols[2] || "long").toLowerCase().trim() === "short" ? "short" : "long";
 
-            const entryPrice = parseFloat(cols[getColIdx("entry price")] || cols[5]) || 0;
-            const exitPrice = parseFloat(cols[getColIdx("exit price")] || cols[6]) || 0;
-            const qty = parseFloat(cols[getColIdx("quantity")] || cols[7]) || 0;
+            const entryDateCol = getColIdx("entry date");
+            const exitDateCol = getColIdx("exit date");
+            const rawEntryDate = entryDateCol !== -1 ? cols[entryDateCol] : cols[3] || new Date().toISOString();
+            const rawExitDate = exitDateCol !== -1 ? cols[exitDateCol] : cols[4] || new Date().toISOString();
 
-            const stopLossRaw = cols[getColIdx("stop loss")] || cols[8];
+            const entryPriceCol = getColIdx("entry price");
+            const exitPriceCol = getColIdx("exit price");
+            const qtyCol = getColIdx("quantity");
+            const entryPrice = parseFloat(entryPriceCol !== -1 ? cols[entryPriceCol] : cols[5]) || 0;
+            const exitPrice = parseFloat(exitPriceCol !== -1 ? cols[exitPriceCol] : cols[6]) || 0;
+            const qty = parseFloat(qtyCol !== -1 ? cols[qtyCol] : cols[7]) || 0;
+
+            const stopLossCol = getColIdx("stop loss");
+            const stopLossRaw = stopLossCol !== -1 ? cols[stopLossCol] : cols[8];
             const stopLoss = stopLossRaw ? parseFloat(stopLossRaw) : null;
-            const fees = parseFloat(cols[getColIdx("fees")] || cols[9]) || 0;
 
-            const setup = cols[getColIdx("setup")] || cols[10] || "";
-            const notes = cols[getColIdx("notes")] || cols[11] || "";
-            const lessons = cols[getColIdx("lessons")] || cols[12] || "";
-            const screenshotUrl = cols[getColIdx("screenshot")] || cols[13] || "";
+            const feesCol = getColIdx("fees");
+            const fees = parseFloat(feesCol !== -1 ? cols[feesCol] : cols[9]) || 0;
 
-            const sigEntryRaw = cols[getColIdx("signal entry")] || cols[14];
-            const sigExitRaw = cols[getColIdx("signal exit")] || cols[15];
+            const setupCol = getColIdx("setup");
+            const notesCol = getColIdx("notes");
+            const lessonsCol = getColIdx("lessons");
+            const screenshotCol = getColIdx("screenshot");
 
-            const accountId = cols[getColIdx("account")] || cols[16] || "Personal";
-            const mistake = cols[getColIdx("mistake")] || cols[17] || "";
-            const assetClass = cols[getColIdx("asset class")] || cols[18] || "stocks";
-            const status = cols[getColIdx("status")] || cols[19] || "executed";
+            const setup = setupCol !== -1 ? cols[setupCol] : cols[10] || "";
+            const notes = notesCol !== -1 ? cols[notesCol] : cols[11] || "";
+            const lessons = lessonsCol !== -1 ? cols[lessonsCol] : cols[12] || "";
+            const screenshotUrl = screenshotCol !== -1 ? cols[screenshotCol] : cols[13] || "";
+
+            const sigEntryCol = getColIdx("signal entry");
+            const sigExitCol = getColIdx("signal exit");
+            const sigEntryRaw = sigEntryCol !== -1 ? cols[sigEntryCol] : cols[14];
+            const sigExitRaw = sigExitCol !== -1 ? cols[sigExitCol] : cols[15];
+
+            const accountCol = getColIdx("account");
+            const explicitAccount = accountCol !== -1 ? cols[accountCol] : null;
+            const accountId = (explicitAccount && explicitAccount.trim() !== "") ? explicitAccount.trim() : activeAccount;
+
+            const mistakeCol = getColIdx("mistake");
+            const assetClassCol = getColIdx("asset class");
+            const statusCol = getColIdx("status");
+
+            const mistake = mistakeCol !== -1 ? cols[mistakeCol] : "";
+            const assetClass = assetClassCol !== -1 ? cols[assetClassCol] : "stocks";
+            const status = statusCol !== -1 ? cols[statusCol] : "executed";
 
             const trade = {
               id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
@@ -1056,59 +1085,90 @@ class StateManager {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target.result);
-          let text = "";
-          for (let i = 0; i < data.length; i++) {
-            text += String.fromCharCode(data[i]);
-          }
-          
-          const rawRows = text.split(/\r?\n/).filter(r => r.trim() !== "");
-          if (rawRows.length < 2) {
-            return reject(new Error("Excel/XLSX text stream does not contain valid tabular data."));
-          }
-          
-          const parseTabLine = (line) => line.split(/\t|,/).map(cell => {
-            let c = cell.trim();
-            if (c.startsWith('"') && c.endsWith('"')) {
-              c = c.substring(1, c.length - 1).replace(/""/g, '"');
-            }
-            return c;
-          });
+          const activeAccount = this.settings.currentAccount || "Personal";
+          let dataRows = [];
 
-          const headerRow = parseTabLine(rawRows[0]).map(h => h.toLowerCase());
+          if (typeof window.XLSX !== "undefined") {
+            const data = new Uint8Array(e.target.result);
+            const workbook = window.XLSX.read(data, { type: "array" });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const sheetRows = window.XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            if (!sheetRows || sheetRows.length < 2) {
+              return reject(new Error("Excel sheet does not contain valid tabular data."));
+            }
+            dataRows = sheetRows;
+          } else {
+            const text = new TextDecoder().decode(e.target.result);
+            const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+            if (lines.length < 2) {
+              return reject(new Error("File does not contain valid tabular data."));
+            }
+            dataRows = lines.map(line => line.split(/,|\t/));
+          }
+
+          const headerRow = dataRows[0].map(h => String(h || "").toLowerCase().trim());
           const getColIdx = (name) => headerRow.findIndex(h => h.includes(name));
 
           let addedCount = 0;
           let skippedCount = 0;
 
-          rawRows.slice(1).forEach(rowStr => {
-            const row = parseTabLine(rowStr);
-            if (row.length < 3) return;
+          dataRows.slice(1).forEach(row => {
+            if (!row || row.length < 3) return;
 
-            const symbol = (row[getColIdx("symbol")] || row[1] || "UNKNOWN").toUpperCase();
-            const direction = (row[getColIdx("direction")] || row[2] || "long").toLowerCase() === "short" ? "short" : "long";
+            const symbolCol = getColIdx("symbol");
+            const rawSym = symbolCol !== -1 ? row[symbolCol] : row[1];
+            const symbol = String(rawSym || "").toUpperCase().trim();
+            if (!symbol || symbol === "UNKNOWN" || symbol === "SYMBOL") return;
 
-            const rawEntryDate = row[getColIdx("entry date")] || row[3] || new Date().toISOString();
-            const rawExitDate = row[getColIdx("exit date")] || row[4] || new Date().toISOString();
+            const dirCol = getColIdx("direction");
+            const rawDir = dirCol !== -1 ? row[dirCol] : row[2];
+            const direction = String(rawDir || "long").toLowerCase().trim() === "short" ? "short" : "long";
 
-            const entryPrice = parseFloat(row[getColIdx("entry price")] || row[5]) || 0;
-            const exitPrice = parseFloat(row[getColIdx("exit price")] || row[6]) || 0;
-            const qty = parseFloat(row[getColIdx("quantity")] || row[7]) || 0;
-            const stopLoss = row[getColIdx("stop loss")] ? parseFloat(row[getColIdx("stop loss")]) : null;
-            const fees = parseFloat(row[getColIdx("fees")] || row[9]) || 0;
+            const entryDateCol = getColIdx("entry date");
+            const exitDateCol = getColIdx("exit date");
+            const rawEntryDate = entryDateCol !== -1 ? row[entryDateCol] : row[3] || new Date().toISOString();
+            const rawExitDate = exitDateCol !== -1 ? row[exitDateCol] : row[4] || new Date().toISOString();
 
-            const setup = row[getColIdx("setup")] || row[10] || "";
-            const notes = row[getColIdx("notes")] || row[11] || "";
-            const lessons = row[getColIdx("lessons")] || row[12] || "";
-            const screenshotUrl = row[getColIdx("screenshot")] || row[13] || "";
+            const entryPriceCol = getColIdx("entry price");
+            const exitPriceCol = getColIdx("exit price");
+            const qtyCol = getColIdx("quantity");
+            const entryPrice = parseFloat(entryPriceCol !== -1 ? row[entryPriceCol] : row[5]) || 0;
+            const exitPrice = parseFloat(exitPriceCol !== -1 ? row[exitPriceCol] : row[6]) || 0;
+            const qty = parseFloat(qtyCol !== -1 ? row[qtyCol] : row[7]) || 0;
 
-            const sigEntry = row[getColIdx("signal entry")] ? parseFloat(row[getColIdx("signal entry")]) : null;
-            const sigExit = row[getColIdx("signal exit")] ? parseFloat(row[getColIdx("signal exit")]) : null;
+            const stopLossCol = getColIdx("stop loss");
+            const stopLossRaw = stopLossCol !== -1 ? row[stopLossCol] : row[8];
+            const stopLoss = stopLossRaw != null && stopLossRaw !== "" ? parseFloat(stopLossRaw) : null;
 
-            const accountId = row[getColIdx("account")] || row[16] || "Personal";
-            const mistake = row[getColIdx("mistake")] || row[17] || "";
-            const assetClass = row[getColIdx("asset class")] || row[18] || "stocks";
-            const status = row[getColIdx("status")] || row[19] || "executed";
+            const feesCol = getColIdx("fees");
+            const fees = parseFloat(feesCol !== -1 ? row[feesCol] : row[9]) || 0;
+
+            const setupCol = getColIdx("setup");
+            const notesCol = getColIdx("notes");
+            const lessonsCol = getColIdx("lessons");
+            const screenshotCol = getColIdx("screenshot");
+
+            const setup = String(setupCol !== -1 ? row[setupCol] : row[10] || "").trim();
+            const notes = String(notesCol !== -1 ? row[notesCol] : row[11] || "").trim();
+            const lessons = String(lessonsCol !== -1 ? row[lessonsCol] : row[12] || "").trim();
+            const screenshotUrl = String(screenshotCol !== -1 ? row[screenshotCol] : row[13] || "").trim();
+
+            const sigEntryCol = getColIdx("signal entry");
+            const sigExitCol = getColIdx("signal exit");
+            const sigEntryRaw = sigEntryCol !== -1 ? row[sigEntryCol] : row[14];
+            const sigExitRaw = sigExitCol !== -1 ? row[sigExitCol] : row[15];
+
+            const accountCol = getColIdx("account");
+            const explicitAccount = accountCol !== -1 ? String(row[accountCol] || "").trim() : null;
+            const accountId = (explicitAccount && explicitAccount !== "" && explicitAccount.toLowerCase() !== "undefined") ? explicitAccount : activeAccount;
+
+            const mistakeCol = getColIdx("mistake");
+            const assetClassCol = getColIdx("asset class");
+            const statusCol = getColIdx("status");
+
+            const mistake = String(mistakeCol !== -1 ? row[mistakeCol] : "").trim();
+            const assetClass = String(assetClassCol !== -1 ? row[assetClassCol] : "stocks").trim() || "stocks";
+            const status = String(statusCol !== -1 ? row[statusCol] : "executed").trim() || "executed";
 
             const trade = {
               id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
@@ -1125,8 +1185,8 @@ class StateManager {
               notes,
               lessons,
               screenshotUrl,
-              signalEntryPrice: sigEntry,
-              signalExitPrice: sigExit,
+              signalEntryPrice: sigEntryRaw != null && sigEntryRaw !== "" ? parseFloat(sigEntryRaw) : null,
+              signalExitPrice: sigExitRaw != null && sigExitRaw !== "" ? parseFloat(sigExitRaw) : null,
               accountId,
               mistake,
               assetClass,
@@ -1134,8 +1194,8 @@ class StateManager {
               overridePnl: false,
               manualPnl: null,
               interventionType: "followed",
-              maxPrice: row[getColIdx("maxprice")] ? parseFloat(row[getColIdx("maxprice")]) : null,
-              minPrice: row[getColIdx("minprice")] ? parseFloat(row[getColIdx("minprice")]) : null
+              maxPrice: null,
+              minPrice: null
             };
 
             if (this.isDuplicateTrade(trade)) {
@@ -1150,9 +1210,9 @@ class StateManager {
           });
 
           this.saveToStorage();
-          resolve({ total: rawRows.length - 1, added: addedCount, skipped: skippedCount });
+          resolve({ total: dataRows.length - 1, added: addedCount, skipped: skippedCount });
         } catch (err) {
-          reject(new Error("Failed to parse XLSX data stream: " + err.message));
+          reject(new Error("Failed to parse Excel file: " + err.message));
         }
       };
       reader.onerror = () => reject(new Error("Failed to read file."));

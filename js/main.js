@@ -278,46 +278,41 @@ function setupActionButtons() {
       const file = e.target.files[0];
       if (!file) return;
 
+      const handleImportResult = (res, typeLabel) => {
+        const added = typeof res === "object" ? res.added : res;
+        const skipped = typeof res === "object" ? res.skipped : 0;
+        if (added === 0) {
+          if (skipped > 0) {
+            showToast(`All ${skipped} trades in this ${typeLabel} file were already imported (duplicates skipped).`, "warning");
+          } else {
+            showToast(`No valid trades were imported from ${typeLabel} file.`, "warning");
+          }
+        } else {
+          let msg = `Successfully imported ${added} new trade${added > 1 ? 's' : ''}!`;
+          if (skipped > 0) msg += ` (${skipped} duplicate${skipped > 1 ? 's' : ''} skipped)`;
+          showToast(msg, "success");
+          handleStateChange();
+        }
+      };
+
       const ext = file.name.split('.').pop().toLowerCase();
+
       if (ext === "json") {
         AppState.importJSON(file)
-          .then(count => {
-            if (count === 0) {
-              showToast("All trades in this JSON file were already imported (duplicates skipped).", "warning");
-            } else {
-              showToast(`Successfully imported ${count} new trades from JSON file!`, "success");
-              handleStateChange();
-            }
-          })
+          .then(res => handleImportResult(res, "JSON"))
           .catch(err => showToast(err.message, "error"));
       } else if (ext === "csv") {
         AppState.importCSV(file)
-          .then(count => {
-            if (count === 0) {
-              showToast("All trades in this CSV file were already imported (duplicates skipped).", "warning");
-            } else {
-              showToast(`Successfully imported ${count} new trades from CSV file!`, "success");
-              handleStateChange();
-            }
-          })
+          .then(res => handleImportResult(res, "CSV"))
           .catch(err => showToast(err.message, "error"));
-      } else if (ext === "xlsx") {
+      } else if (ext === "xlsx" || ext === "xls") {
         AppState.importXLSX(file)
-          .then(count => {
-            if (count === 0) {
-              showToast("All trades in this Excel file were already imported (duplicates skipped).", "warning");
-            } else {
-              showToast(`Successfully imported ${count} new trades from Excel file!`, "success");
-              handleStateChange();
-            }
-          })
+          .then(res => handleImportResult(res, "Excel"))
           .catch(err => showToast(err.message, "error"));
       } else {
-        showToast("Unsupported file format. Please upload JSON, CSV, or XLSX.", "error");
+        showToast("Unsupported file format. Please select a .json, .csv, or .xlsx file.", "error");
       }
-      
-      // Reset file input value
-      importFileInput.value = "";
+      e.target.value = "";
     });
   }
 
