@@ -171,7 +171,6 @@ h1, h2, h3, h4, h5, h6 {
   gap: 12px;
 }
 
-/* Input elements styling */
 input, select, textarea {
   background-color: var(--bg-input);
   border: 1px solid var(--border);
@@ -182,6 +181,17 @@ input, select, textarea {
   font-size: 0.875rem;
   outline: none;
   transition: all 0.2s ease;
+}
+
+select option {
+  background-color: #18181b;
+  color: #fafafa;
+  padding: 8px 12px;
+}
+
+body.light-theme select option {
+  background-color: #ffffff;
+  color: #18181b;
 }
 
 input:focus, select:focus, textarea:focus {
