@@ -206,30 +206,32 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-icon {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 8px;
   transition: all 0.2s ease;
 }
 
 .btn-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   stroke: currentColor;
   stroke-width: 2px;
   fill: none;
 }
 
 .btn-icon:hover {
-  background-color: var(--border);
-  color: var(--text-primary);
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-active);
+  color: var(--accent);
 }
 
 .btn-primary {
