@@ -1,4 +1,4 @@
-import { calcNetPnl, formatCurrency, escapeHtml, calcSignalPnl, calcPnlDiff } from './utils.js';
+import { calcNetPnl, formatCurrency, escapeHtml, calcSignalPnl, calcPnlDiff, isSkippedTrade } from './utils.js';
 
 let currentYear = 2026;
 let currentMonth = 5; // 0-indexed, so 5 = June
@@ -183,7 +183,7 @@ export function openDayPanel(dateStr, trades) {
     const escapedNotes = escapeHtml(t.notes);
 
     let signalDiffHtml = "";
-    if (t.status !== "skipped" && (t.signalEntryPrice != null || t.signalExitPrice != null)) {
+    if (!isSkippedTrade(t) && (t.signalEntryPrice != null || t.signalExitPrice != null)) {
       const sigPnl = calcSignalPnl(t);
       const diff = sigPnl - netPnl;
       const diffClass = diff < 0 ? "profit" : diff > 0 ? "loss" : "";
