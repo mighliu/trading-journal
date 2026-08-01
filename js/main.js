@@ -1,4 +1,7 @@
-import { AppState } from './state.js';
+import {
+  renderMonteCarloChart,
+  renderEdgeInsights,
+  renderPsychologyAnalyticsCard, AppState } from './state.js';
 import { demoTrades } from '../demo-data.js';
 import { 
   renderStatsBanner, 
@@ -63,6 +66,7 @@ async function init() {
   // 2. Setup general DOM listeners
   setupUIListeners();
   setupTabRouting();
+  setupScreenshotDropzones();
   setupActionButtons();
 
   // 3. Register state change callbacks
@@ -165,6 +169,7 @@ function renderActiveView(filteredTrades) {
   destroyAllCharts();
 
   if (currentTab === "dashboard") {
+    renderEdgeInsights();
     renderEquityCurve(filteredTrades, AppState.settings.startingBalance);
     renderDailyPnlChart(filteredTrades);
   } else if (currentTab === "tradeLog") {
@@ -193,6 +198,7 @@ function renderActiveView(filteredTrades) {
     renderHoldTimeScatterChart(filteredTrades);
     renderFatiguePivotChart(filteredTrades);
     renderTradeSequenceChart(filteredTrades);
+    renderPsychologyAnalyticsCard();
 
   } else if (currentTab === "intervention") {
     const backupStatus = AppState.activeFilters.status;
@@ -215,6 +221,7 @@ function renderActiveView(filteredTrades) {
     AppState.activeFilters.status = backupStatus;
 
     renderRiskTab(tradesForRisk);
+    renderMonteCarloChart(tradesForRisk, AppState.settings.startingBalance);
     renderMfeMaeCharts(tradesForRisk);
     renderRMultipleChart(tradesForRisk);
     renderRollingPerformanceChart(tradesForRisk);
@@ -377,3 +384,101 @@ window.addEventListener("themeChanged", () => {
 
 // Kick off when DOM is ready
 document.addEventListener("DOMContentLoaded", init);
+
+function setupScreenshotDropzones() {
+  const setupDropzone = (zoneId, inputId, previewId, fileInputId) => {
+    const zone = document.getElementById(zoneId);
+    const urlInput = document.getElementById(inputId);
+    const preview = document.getElementById(previewId);
+    const fileInput = document.getElementById(fileInputId);
+
+    if (!zone || !urlInput) return;
+
+    zone.addEventListener("click", () => fileInput && fileInput.click());
+
+    zone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      zone.classList.add("dragover");
+    });
+
+    zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+
+    const handleFile = async (file) => {
+      if (!file || !file.type.startsWith("image/")) return;
+      try {
+        const compressed = await compressImage(file, 1000, 0.8);
+        urlInput.value = compressed;
+        if (preview) {
+          preview.style.display = "block";
+          preview.querySelector("img").src = compressed;
+        }
+      } catch (err) {
+        console.error("Image compression failed:", err);
+      }
+    };
+
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("dragover");
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    if (fileInput) {
+      fileInput.addEventListener("change", (e) => {
+        if (e.target.files && e.target.files[0]) {
+          handleFile(e.target.files[0]);
+        }
+      });
+    }
+  };
+
+  setupDropzone("screenshotDropzone1", "tradeScreenshotUrl", "screenshotPreview1", "screenshotFile1");
+  setupDropzone("screenshotDropzone2", "tradeScreenshotUrl2", "screenshotPreview2", "screenshotFile2");
+
+  // Global Paste Listener for Trade Modal
+  document.addEventListener("paste", async (e) => {
+    const modal = document.getElementById("tradeModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let item of items) {
+      if (item.type.indexOf("image") !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          try {
+            const compressed = await compressImage(file, 1000, 0.8);
+            const input1 = document.getElementById("tradeScreenshotUrl");
+            const input2 = document.getElementById("tradeScreenshotUrl2");
+            const preview1 = document.getElementById("screenshotPreview1");
+            const preview2 = document.getElementById("screenshotPreview2");
+
+            if (!input1.value) {
+              input1.value = compressed;
+              if (preview1) { preview1.style.display = "block"; preview1.querySelector("img").src = compressed; }
+              showToast("Pasted image to Entry Chart!", "success");
+            } else {
+              input2.value = compressed;
+              if (preview2) { preview2.style.display = "block"; preview2.querySelector("img").src = compressed; }
+              showToast("Pasted image to Exit Chart!", "success");
+            }
+          } catch (err) {
+            console.error("Paste image compression error:", err);
+          }
+        }
+      }
+    }
+  });
+
+  const mcBtn = document.getElementById("runMonteCarloBtn");
+  if (mcBtn) {
+    mcBtn.addEventListener("click", () => {
+      const tradesForRisk = AppState.getFilteredTrades();
+      renderMonteCarloChart(tradesForRisk, AppState.settings.startingBalance);
+      showToast("Re-ran 500 Monte Carlo simulation paths!", "info");
+    });
+  }
+}

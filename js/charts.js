@@ -3801,3 +3801,89 @@ export function renderFatiguePivotChart(trades) {
 
 
 
+
+export function renderMonteCarloChart(trades, startingBalance = 25000) {
+  const canvasId = "monteCarloChart";
+  destroyChart(canvasId);
+
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const simResult = runMonteCarloSimulation(trades, startingBalance, 500, 50);
+  
+  const probElem = document.getElementById("mcProfitProb");
+  const avgEqElem = document.getElementById("mcAvgEquity");
+  const p95Elem = document.getElementById("mcP95");
+  const p5Elem = document.getElementById("mcP5");
+
+  if (probElem) probElem.textContent = `${simResult.profitProbability.toFixed(1)}%`;
+  if (avgEqElem) avgEqElem.textContent = `$${Math.round(simResult.avgFinalEquity).toLocaleString()}`;
+  if (p95Elem) p95Elem.textContent = `$${Math.round(simResult.p95[simResult.p95.length - 1] || startingBalance).toLocaleString()}`;
+  if (p5Elem) p5Elem.textContent = `$${Math.round(simResult.p5[simResult.p5.length - 1] || startingBalance).toLocaleString()}`;
+
+  const labels = Array.from({ length: 51 }, (_, i) => `Trade ${i}`);
+
+  const datasets = [
+    {
+      label: "95th Percentile (Best Case)",
+      data: simResult.p95,
+      borderColor: "#34d399",
+      backgroundColor: "rgba(52, 211, 153, 0.05)",
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: "+1"
+    },
+    {
+      label: "50th Percentile (Median Path)",
+      data: simResult.p50,
+      borderColor: "#818cf8",
+      backgroundColor: "transparent",
+      borderWidth: 2.5,
+      pointRadius: 0
+    },
+    {
+      label: "5th Percentile (Worst Case Risk)",
+      data: simResult.p5,
+      borderColor: "#ef4444",
+      backgroundColor: "rgba(239, 68, 68, 0.05)",
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false
+    }
+  ];
+
+  chartInstances[canvasId] = new Chart(canvas, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: { color: getTickColor(), font: { family: "Inter, sans-serif", size: 11 } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.dataset.label}: $${Math.round(ctx.parsed.y).toLocaleString()}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: getGridColor() },
+          ticks: { color: getTickColor() }
+        },
+        y: {
+          grid: { color: getGridColor() },
+          ticks: {
+            color: getTickColor(),
+            callback: (val) => `$${val.toLocaleString()}`
+          }
+        }
+      }
+    }
+  });
+}

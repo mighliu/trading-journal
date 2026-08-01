@@ -1,4 +1,8 @@
-import { AppState } from './state.js';
+import {
+  renderMonteCarloChart,
+  generateEdgeInsights,
+  calcPsychologyAnalytics,
+  compressImage, AppState } from './state.js';
 import { closeDayPanel } from './calendar.js';
 import { 
   calcNetPnl, 
@@ -649,6 +653,11 @@ export function openTradeModal(id = null) {
   document.getElementById("tradeIntervention").value = "early_profit";
   document.getElementById("tradeMaxPrice").value = "";
   document.getElementById("tradeMinPrice").value = "";
+  document.getElementById("tradeEmotionTag").value = "Disciplined";
+  document.getElementById("tradeExecutionScore").value = "A";
+  document.getElementById("tradeScreenshotUrl2").value = "";
+  const prev1 = document.getElementById("screenshotPreview1"); if (prev1) prev1.style.display = "none";
+  const prev2 = document.getElementById("screenshotPreview2"); if (prev2) prev2.style.display = "none";
   
   // Reset checklist elements
   const chkItems = ["chkTrend", "chkLevel", "chkVolume", "chkTrigger", "chkRisk"];
@@ -691,6 +700,13 @@ export function openTradeModal(id = null) {
       document.getElementById("tradeManualPnl").value = trade.manualPnl != null ? trade.manualPnl : "";
       document.getElementById("tradeMaxPrice").value = trade.maxPrice != null ? trade.maxPrice : "";
       document.getElementById("tradeMinPrice").value = trade.minPrice != null ? trade.minPrice : "";
+      document.getElementById("tradeEmotionTag").value = trade.emotionTag || "Disciplined";
+      document.getElementById("tradeExecutionScore").value = trade.executionScore || "A";
+      document.getElementById("tradeScreenshotUrl2").value = trade.screenshotUrl2 || "";
+      const p1 = document.getElementById("screenshotPreview1");
+      if (p1 && trade.screenshotUrl) { p1.style.display = "block"; p1.querySelector("img").src = trade.screenshotUrl; }
+      const p2 = document.getElementById("screenshotPreview2");
+      if (p2 && trade.screenshotUrl2) { p2.style.display = "block"; p2.querySelector("img").src = trade.screenshotUrl2; }
       
       const hasInt = trade.interventionType && trade.interventionType !== "followed";
       document.getElementById("tradeHasIntervention").checked = hasInt;
@@ -2208,4 +2224,81 @@ export function renderAnalyticsTab(trades) {
       }).join("");
     }
   }
+}
+
+export function renderEdgeInsights() {
+  const container = document.getElementById("edgeInsightsContainer");
+  if (!container) return;
+
+  const trades = AppState.getFilteredTrades();
+  const insights = generateEdgeInsights(trades);
+
+  if (insights.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+
+  container.innerHTML = insights.map(item => `
+    <div class="insight-card insight-${item.type}">
+      <i data-lucide="${item.type === 'success' ? 'sparkles' : (item.type === 'warning' ? 'alert-triangle' : 'info')}" style="width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px;"></i>
+      <div>
+        <strong style="display: block; margin-bottom: 2px; font-size: 0.875rem;">${item.title}</strong>
+        <span>${item.message}</span>
+      </div>
+    </div>
+  `).join("");
+
+  if (typeof lucide !== "undefined") lucide.createIcons();
+}
+
+export function renderPsychologyAnalyticsCard() {
+  const container = document.getElementById("psychologyAnalyticsContainer");
+  if (!container) return;
+
+  const trades = AppState.getFilteredTrades();
+  const { emotionStats, gradeStats } = calcPsychologyAnalytics(trades);
+
+  const emotionRows = Object.entries(emotionStats)
+    .filter(([_, d]) => d.count > 0)
+    .map(([emo, d]) => {
+      const wr = Math.round((d.wins / d.count) * 100);
+      const pnlColor = d.pnl >= 0 ? "var(--profit)" : "var(--loss)";
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+          <span class="badge-emotion">${emo}</span>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <span class="muted">${d.count} trades (${wr}% win)</span>
+            <strong style="color: ${pnlColor}; min-width: 70px; text-align: right;">${d.pnl >= 0 ? '+' : ''}$${d.pnl.toFixed(2)}</strong>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  const gradeRows = Object.entries(gradeStats)
+    .filter(([_, d]) => d.count > 0)
+    .map(([grade, d]) => {
+      const wr = Math.round((d.wins / d.count) * 100);
+      const pnlColor = d.pnl >= 0 ? "var(--profit)" : "var(--loss)";
+      const gradeClass = grade.toLowerCase().replace('+', '');
+      return `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+          <span class="badge-grade badge-grade-${gradeClass}">${grade}</span>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <span class="muted">${d.count} trades (${wr}% win)</span>
+            <strong style="color: ${pnlColor}; min-width: 70px; text-align: right;">${d.pnl >= 0 ? '+' : ''}$${d.pnl.toFixed(2)}</strong>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  container.innerHTML = `
+    <div style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 14px;">
+      <h4 style="margin: 0 0 10px; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Performance by Emotion</h4>
+      ${emotionRows || '<span class="muted" style="font-size: 0.75rem;">No emotional state data logged yet.</span>'}
+    </div>
+    <div style="background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; padding: 14px;">
+      <h4 style="margin: 0 0 10px; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Performance by Execution Grade</h4>
+      ${gradeRows || '<span class="muted" style="font-size: 0.75rem;">No execution grades logged yet.</span>'}
+    </div>
+  `;
 }

@@ -304,6 +304,9 @@
 
       <!-- ==================== TAB CONTENT: DASHBOARD ==================== -->
       <div id="dashboardTabContent" class="tab-content">
+        <!-- Automated AI Edge & Leak Insights -->
+        <div id="edgeInsightsContainer" style="margin-bottom: 20px;"></div>
+
         <div class="dashboard-grid">
           <!-- Cumulative Equity Curve Card -->
           <div class="chart-card">
@@ -551,6 +554,16 @@
               <h3 class="chart-title"><i data-lucide="bar-chart" style="color: #10b981"></i> Win/Loss Size Distribution <span class="tooltip-trigger" data-tooltip="Groups trade outcomes into size ranges to check if you are keeping losses small and letting wins run."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
             </div>
             <div class="chart-container-medium"><canvas id="distributionChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Trader Psychology & Execution Intelligence Card -->
+        <div class="chart-card" style="margin-bottom: 28px;">
+          <div class="chart-header">
+            <h3 class="chart-title"><i data-lucide="brain" style="color: #ec4899"></i> Trader Psychology & Execution Intelligence <span class="tooltip-trigger" data-tooltip="Correlates emotional states (FOMO, Revenge, Disciplined) and Execution Grades (A+ to F) with net performance."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+          </div>
+          <div id="psychologyAnalyticsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; padding: 12px 0;">
+            <!-- Rendered dynamically -->
           </div>
         </div>
 
@@ -996,6 +1009,31 @@
           <div class="chart-container-medium" style="height: 280px;"><canvas id="rollingPerformanceChart"></canvas></div>
         </div>
 
+        <!-- ── Group 3.5: Monte Carlo Equity Simulator ─────────────────────── -->
+        <div style="display:flex;align-items:center;gap:12px;margin:24px 0 14px;">
+          <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Monte Carlo Equity Simulation & Risk Forecasting</span>
+          <div style="flex:1;height:1px;background:rgba(255,255,255,0.06);"></div>
+        </div>
+
+        <div class="chart-card" style="margin-bottom: 24px;">
+          <div class="chart-header" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+              <h3 class="chart-title"><i data-lucide="shuffle" style="color: #6366f1"></i> Monte Carlo Equity Simulator (500 Random Resamples) <span class="tooltip-trigger" data-tooltip="Simulates 500 randomized future trading paths using your actual historical return distribution to project 95th percentile, median, and 5th percentile drawdown risks."><i data-lucide="help-circle" style="width: 11px; height: 11px;"></i></span></h3>
+              <button type="button" id="runMonteCarloBtn" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i> Re-Run Simulation</button>
+            </div>
+            <div id="monteCarloStatsBar" style="display: flex; gap: 16px; font-size: 0.8125rem; color: var(--text-secondary); flex-wrap: wrap;">
+              <span>Prob. of Profit: <strong id="mcProfitProb" style="color: var(--profit);">--%</strong></span>
+              <span>•</span>
+              <span>Avg Final Equity: <strong id="mcAvgEquity">$--</strong></span>
+              <span>•</span>
+              <span>95th Percentile: <strong id="mcP95" style="color: var(--profit);">$--</strong></span>
+              <span>•</span>
+              <span>5th Percentile Risk: <strong id="mcP5" style="color: var(--loss);">$--</strong></span>
+            </div>
+          </div>
+          <div class="chart-container-medium" style="height: 300px;"><canvas id="monteCarloChart"></canvas></div>
+        </div>
+
         <!-- ── Group 4: Trade Execution Analysis ─────────────────────────────── -->
         <div style="display:flex;align-items:center;gap:12px;margin:0 0 14px;">
           <span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-secondary);">Trade Execution Analysis</span>
@@ -1184,6 +1222,32 @@
               </div>
             </div>
 
+            <!-- Emotional State & Execution Score -->
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeEmotionTag"><i data-lucide="smile" style="width: 14px; height: 14px;"></i> Emotional State</label>
+                <select id="tradeEmotionTag">
+                  <option value="Disciplined">Disciplined / Calm</option>
+                  <option value="FOMO">FOMO / Chasing</option>
+                  <option value="Revenge">Revenge / Angry</option>
+                  <option value="Hesitant">Hesitant / Fearful</option>
+                  <option value="Greedy">Greedy / Over-confident</option>
+                  <option value="Anxious">Anxious / Stressed</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="tradeExecutionScore"><i data-lucide="award" style="width: 14px; height: 14px;"></i> Execution Grade</label>
+                <select id="tradeExecutionScore">
+                  <option value="A+">A+ (Flawless Execution)</option>
+                  <option value="A">A (Great Execution)</option>
+                  <option value="B">B (Good Execution)</option>
+                  <option value="C">C (Minor Rule Violation)</option>
+                  <option value="D">D (Poor Execution)</option>
+                  <option value="F">F (Complete Breakdown)</option>
+                </select>
+              </div>
+            </div>
+
             <!-- Dates -->
             <div class="form-grid-2">
               <div class="form-group">
@@ -1307,9 +1371,34 @@
               <textarea id="tradeLessons" placeholder="Reflect on execution, discipline, emotions, rules..." rows="2"></textarea>
             </div>
 
-            <div class="form-group">
-              <label for="tradeScreenshotUrl">Screenshot URL (external chart image)</label>
-              <input type="url" id="tradeScreenshotUrl" placeholder="https://image-hosting.com/chart.png">
+            <!-- Dual Chart Screenshots & Paste Dropzones -->
+            <div class="form-section-header">
+              <i data-lucide="image" style="width: 14px; height: 14px;"></i>
+              Chart Screenshots (Paste Ctrl+V or Drop Files)
+            </div>
+            
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label for="tradeScreenshotUrl">Entry Chart (Paste / Drag or URL)</label>
+                <div id="screenshotDropzone1" class="image-dropzone" style="border: 2px dashed var(--border); border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; background: var(--bg-input); margin-bottom: 8px;">
+                  <i data-lucide="upload-cloud" style="width: 20px; height: 20px; color: var(--accent); margin-bottom: 4px;"></i>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">Click, Drop, or Press <b>Ctrl+V</b></div>
+                  <input type="file" id="screenshotFile1" accept="image/*" style="display: none;">
+                  <div id="screenshotPreview1" style="margin-top: 6px; display: none;"><img src="" style="max-height: 80px; border-radius: 4px; border: 1px solid var(--border);"></div>
+                </div>
+                <input type="url" id="tradeScreenshotUrl" placeholder="https://image-hosting.com/entry.png" style="font-size: 0.75rem;">
+              </div>
+
+              <div class="form-group">
+                <label for="tradeScreenshotUrl2">Exit Chart (Paste / Drag or URL)</label>
+                <div id="screenshotDropzone2" class="image-dropzone" style="border: 2px dashed var(--border); border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; background: var(--bg-input); margin-bottom: 8px;">
+                  <i data-lucide="upload-cloud" style="width: 20px; height: 20px; color: var(--accent); margin-bottom: 4px;"></i>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">Click, Drop, or Press <b>Ctrl+V</b></div>
+                  <input type="file" id="screenshotFile2" accept="image/*" style="display: none;">
+                  <div id="screenshotPreview2" style="margin-top: 6px; display: none;"><img src="" style="max-height: 80px; border-radius: 4px; border: 1px solid var(--border);"></div>
+                </div>
+                <input type="url" id="tradeScreenshotUrl2" placeholder="https://image-hosting.com/exit.png" style="font-size: 0.75rem;">
+              </div>
             </div>
 
           </div>

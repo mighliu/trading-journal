@@ -2043,3 +2043,69 @@ body.light-theme .live-math-bottom {
   box-shadow: 0 4px 15px -2px var(--loss-glow);
 }
 
+
+/* Image Paste Dropzone */
+.image-dropzone {
+  transition: all 0.2s ease;
+}
+.image-dropzone:hover, .image-dropzone.dragover {
+  border-color: var(--accent) !important;
+  background: rgba(139, 92, 246, 0.08) !important;
+}
+
+/* Insight Cards */
+.insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 0.8125rem;
+  border: 1px solid var(--border);
+}
+.insight-card.insight-success {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+.insight-card.insight-warning {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+.insight-card.insight-info {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #818cf8;
+}
+
+/* Emotion & Grade Badges */
+.badge-emotion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+}
+.badge-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+.badge-grade-a { color: #34d399; border-color: rgba(52, 211, 153, 0.4); }
+.badge-grade-b { color: #60a5fa; border-color: rgba(96, 165, 250, 0.4); }
+.badge-grade-c { color: #fbbf24; border-color: rgba(251, 191, 36, 0.4); }
+.badge-grade-d { color: #f97316; border-color: rgba(249, 115, 22, 0.4); }
+.badge-grade-f { color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }

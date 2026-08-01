@@ -1363,3 +1363,212 @@ export function calcSetupMistakeMatrix(trades) {
     matrix
   };
 }
+
+export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns = 500, horizon = 50) {
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  if (executed.length === 0) {
+    return {
+      runs: [],
+      p95: [],
+      p50: [],
+      p5: [],
+      maxDrawdownDist: [],
+      profitProbability: 0,
+      avgFinalEquity: startingBalance
+    };
+  }
+
+  const returns = executed.map(t => calcNetPnl(t));
+  const runs = [];
+  const maxDrawdowns = [];
+
+  for (let r = 0; r < numRuns; r++) {
+    const path = [startingBalance];
+    let peak = startingBalance;
+    let maxDd = 0;
+
+    for (let i = 0; i < horizon; i++) {
+      const randomReturn = returns[Math.floor(Math.random() * returns.length)];
+      const currentEq = Math.max(0, path[path.length - 1] + randomReturn);
+      path.push(currentEq);
+
+      if (currentEq > peak) peak = currentEq;
+      const dd = peak > 0 ? (peak - currentEq) / peak : 0;
+      if (dd > maxDd) maxDd = dd;
+    }
+
+    runs.push(path);
+    maxDrawdowns.push(maxDd);
+  }
+
+  // Calculate percentiles at each step
+  const p95 = [];
+  const p50 = [];
+  const p5 = [];
+
+  for (let step = 0; step <= horizon; step++) {
+    const stepValues = runs.map(run => run[step]).sort((a, b) => a - b);
+    p5.push(stepValues[Math.floor(numRuns * 0.05)]);
+    p50.push(stepValues[Math.floor(numRuns * 0.50)]);
+    p95.push(stepValues[Math.floor(numRuns * 0.95)]);
+  }
+
+  const profitableRuns = runs.filter(run => run[run.length - 1] > startingBalance).length;
+  const profitProbability = (profitableRuns / numRuns) * 100;
+  const avgFinalEquity = runs.reduce((sum, run) => sum + run[run.length - 1], 0) / numRuns;
+
+  return {
+    runs: runs.slice(0, 30), // Sample paths for visualization
+    p95,
+    p50,
+    p5,
+    maxDrawdowns,
+    profitProbability,
+    avgFinalEquity
+  };
+}
+
+export function calcPsychologyAnalytics(trades) {
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  
+  const emotionStats = {};
+  const gradeStats = {};
+
+  const emotions = ["Disciplined", "FOMO", "Revenge", "Hesitant", "Greedy", "Anxious", "Unspecified"];
+  const grades = ["A+", "A", "B", "C", "D", "F", "Unspecified"];
+
+  emotions.forEach(e => emotionStats[e] = { count: 0, wins: 0, pnl: 0, grossProfit: 0, grossLoss: 0 });
+  grades.forEach(g => gradeStats[g] = { count: 0, wins: 0, pnl: 0, grossProfit: 0, grossLoss: 0 });
+
+  executed.forEach(t => {
+    const emo = t.emotionTag || "Unspecified";
+    const grade = t.executionScore || "Unspecified";
+    const pnl = calcNetPnl(t);
+
+    if (!emotionStats[emo]) emotionStats[emo] = { count: 0, wins: 0, pnl: 0, grossProfit: 0, grossLoss: 0 };
+    emotionStats[emo].count++;
+    emotionStats[emo].pnl += pnl;
+    if (pnl > 0) { emotionStats[emo].wins++; emotionStats[emo].grossProfit += pnl; }
+    else if (pnl < 0) { emotionStats[emo].grossLoss += Math.abs(pnl); }
+
+    if (!gradeStats[grade]) gradeStats[grade] = { count: 0, wins: 0, pnl: 0, grossProfit: 0, grossLoss: 0 };
+    gradeStats[grade].count++;
+    gradeStats[grade].pnl += pnl;
+    if (pnl > 0) { gradeStats[grade].wins++; gradeStats[grade].grossProfit += pnl; }
+    else if (pnl < 0) { gradeStats[grade].grossLoss += Math.abs(pnl); }
+  });
+
+  return { emotionStats, gradeStats };
+}
+
+export function generateEdgeInsights(trades) {
+  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  if (executed.length < 3) {
+    return [
+      { type: "info", title: "Log More Trades", message: "Complete at least 3 executed trades to unlock automated edge detection & leak analysis." }
+    ];
+  }
+
+  const insights = [];
+
+  // 1. Setup Edge Analysis
+  const setupPnl = {};
+  executed.forEach(t => {
+    const s = t.setup || "Unspecified";
+    if (!setupPnl[s]) setupPnl[s] = { pnl: 0, wins: 0, count: 0 };
+    const pnl = calcNetPnl(t);
+    setupPnl[s].pnl += pnl;
+    setupPnl[s].count++;
+    if (pnl > 0) setupPnl[s].wins++;
+  });
+
+  let bestSetup = null;
+  let bestSetupPnl = -Infinity;
+  Object.entries(setupPnl).forEach(([s, data]) => {
+    if (data.count >= 2 && data.pnl > bestSetupPnl) {
+      bestSetupPnl = data.pnl;
+      bestSetup = { name: s, ...data };
+    }
+  });
+
+  if (bestSetup && bestSetup.pnl > 0) {
+    const wr = Math.round((bestSetup.wins / bestSetup.count) * 100);
+    insights.push({
+      type: "success",
+      title: `Highest Performing Edge: ${bestSetup.name}`,
+      message: `Your "${bestSetup.name}" setup is your top performer with ${wr}% win rate and +$${bestSetup.pnl.toLocaleString('en-US', {minimumFractionDigits: 2})} net profit.`
+    });
+  }
+
+  // 2. Emotional Leak Analysis
+  const { emotionStats } = calcPsychologyAnalytics(executed);
+  let worstEmotion = null;
+  let worstEmotionPnl = Infinity;
+  Object.entries(emotionStats).forEach(([emo, data]) => {
+    if (emo !== "Unspecified" && data.count >= 1 && data.pnl < worstEmotionPnl) {
+      worstEmotionPnl = data.pnl;
+      worstEmotion = { name: emo, ...data };
+    }
+  });
+
+  if (worstEmotion && worstEmotion.pnl < 0) {
+    insights.push({
+      type: "warning",
+      title: `Psychological Leak Detected: ${worstEmotion.name}`,
+      message: `Trading under "${worstEmotion.name}" state has cost you -$${Math.abs(worstEmotion.pnl).toLocaleString('en-US', {minimumFractionDigits: 2})} across ${worstEmotion.count} trades.`
+    });
+  }
+
+  // 3. Direction Preference
+  const longPnl = executed.filter(t => t.direction === "long").reduce((acc, t) => acc + calcNetPnl(t), 0);
+  const shortPnl = executed.filter(t => t.direction === "short").reduce((acc, t) => acc + calcNetPnl(t), 0);
+
+  if (Math.abs(longPnl - shortPnl) > 300) {
+    const strongDir = longPnl > shortPnl ? "LONG" : "SHORT";
+    const weakDir = longPnl > shortPnl ? "SHORT" : "LONG";
+    const diff = Math.abs(longPnl - shortPnl);
+    insights.push({
+      type: "info",
+      title: `Directional Asymmetry: ${strongDir} Outperformance`,
+      message: `You have generated +$${diff.toLocaleString('en-US', {minimumFractionDigits: 2})} more profit trading ${strongDir} positions compared to ${weakDir}.`
+    });
+  }
+
+  return insights;
+}
+
+export function compressImage(file, maxWidth = 1000, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve("");
+    
+    // If already base64 or string URL
+    if (typeof file === "string") return resolve(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error("Failed to load image."));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error("Failed to read image file."));
+    reader.readAsDataURL(file);
+  });
+}
