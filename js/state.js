@@ -152,155 +152,150 @@ class StateManager {
         value TEXT NOT NULL
       );
     `);
-  }
 
-  async migrateFromLocalStorage() {
-    if (!this.db) return;
-    try {
-      const storedTrades = localStorage.getItem("tf_trades");
-      const storedSettings = localStorage.getItem("tf_settings");
+    const optionalColumns = [
+      "screenshot_url2 TEXT",
+      "emotion_tag TEXT",
+      "execution_score TEXT",
+      "checklist_items TEXT",
+      "adherence_score REAL"
+    ];
 
-      let didMigrate = false;
-      if (storedTrades) {
-        const tradesArr = JSON.parse(storedTrades);
-        if (Array.isArray(tradesArr) && tradesArr.length > 0) {
-          console.log(`Migrating ${tradesArr.length} trades from localStorage to SQLite WASM...`);
-          for (const t of tradesArr) {
-            this.insertTradeSql(t);
-          }
-          didMigrate = true;
-        }
-      }
-
-      if (storedSettings) {
-        const settingsObj = JSON.parse(storedSettings);
-        this.db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?)", [JSON.stringify(settingsObj)]);
-        didMigrate = true;
-      }
-
-      if (didMigrate) {
-        await this.saveToStorage();
-        localStorage.removeItem("tf_trades");
-        localStorage.removeItem("tf_settings");
-        console.log("Successfully migrated localStorage data into SQLite WASM!");
-      }
-    } catch (err) {
-      console.error("Migration error:", err);
-    }
+    optionalColumns.forEach(col => {
+      try {
+        this.db.run(`ALTER TABLE trades ADD COLUMN ${col}`);
+      } catch (e) {}
+    });
   }
 
   insertTradeSql(t) {
     if (!this.db) return;
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO trades (
-        id, symbol, direction, entry_date_time, exit_date_time, entry_price, exit_price,
-        qty, stop_loss, fees, setup, notes, lessons, screenshot_url, signal_entry_price,
-        signal_exit_price, account_id, mistake, asset_class, status, override_pnl,
-        manual_pnl, intervention_type, max_price, min_price, mfe, mae, checklist_items, adherence_score
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run([
-      t.id,
-      (t.symbol || "").toUpperCase(),
-      t.direction === "short" ? "short" : "long",
-      normalizeDateTime(t.entryDateTime),
-      normalizeDateTime(t.exitDateTime),
-      parseFloat(t.entryPrice) || 0,
-      parseFloat(t.exitPrice) || 0,
-      parseFloat(t.qty) || 0,
-      t.stopLoss ? parseFloat(t.stopLoss) : null,
-      parseFloat(t.fees) || 0,
-      (t.setup || "").trim(),
-      (t.notes || "").trim(),
-      (t.lessons || "").trim(),
-      (t.screenshotUrl || "").trim(),
-      t.signalEntryPrice ? parseFloat(t.signalEntryPrice) : null,
-      t.signalExitPrice ? parseFloat(t.signalExitPrice) : null,
-      t.accountId || "Personal",
-      (t.mistake || "").trim(),
-      t.assetClass || "stocks",
-      t.status || "executed",
-      t.overridePnl ? 1 : 0,
-      t.manualPnl != null ? parseFloat(t.manualPnl) : null,
-      t.interventionType || "followed",
-      t.maxPrice != null ? parseFloat(t.maxPrice) : null,
-      t.minPrice != null ? parseFloat(t.minPrice) : null,
-      t.mfe != null ? parseFloat(t.mfe) : null,
-      t.mae != null ? parseFloat(t.mae) : null,
-      t.checklistItems ? JSON.stringify(t.checklistItems) : null,
-      t.adherenceScore != null ? parseFloat(t.adherenceScore) : null
-    ]);
-    stmt.free();
+    try {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO trades (
+          id, symbol, direction, entry_date_time, exit_date_time, entry_price, exit_price,
+          qty, stop_loss, fees, setup, notes, lessons, screenshot_url, screenshot_url2,
+          emotion_tag, execution_score, signal_entry_price, signal_exit_price, account_id,
+          mistake, asset_class, status, override_pnl, manual_pnl, intervention_type,
+          max_price, min_price, mfe, mae, checklist_items, adherence_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run([
+        t.id,
+        (t.symbol || "").toUpperCase(),
+        t.direction === "short" ? "short" : "long",
+        normalizeDateTime(t.entryDateTime),
+        normalizeDateTime(t.exitDateTime),
+        parseFloat(t.entryPrice) || 0,
+        parseFloat(t.exitPrice) || 0,
+        parseFloat(t.qty) || 0,
+        t.stopLoss ? parseFloat(t.stopLoss) : null,
+        parseFloat(t.fees) || 0,
+        (t.setup || "").trim(),
+        (t.notes || "").trim(),
+        (t.lessons || "").trim(),
+        (t.screenshotUrl || "").trim(),
+        (t.screenshotUrl2 || "").trim(),
+        t.emotionTag || "Disciplined",
+        t.executionScore || "A",
+        t.signalEntryPrice ? parseFloat(t.signalEntryPrice) : null,
+        t.signalExitPrice ? parseFloat(t.signalExitPrice) : null,
+        t.accountId || "Personal",
+        (t.mistake || "").trim(),
+        t.assetClass || "stocks",
+        t.status || "executed",
+        t.overridePnl ? 1 : 0,
+        t.manualPnl != null ? parseFloat(t.manualPnl) : null,
+        t.interventionType || "followed",
+        t.maxPrice != null ? parseFloat(t.maxPrice) : null,
+        t.minPrice != null ? parseFloat(t.minPrice) : null,
+        t.mfe != null ? parseFloat(t.mfe) : null,
+        t.mae != null ? parseFloat(t.mae) : null,
+        t.checklistItems ? JSON.stringify(t.checklistItems) : null,
+        t.adherenceScore != null ? parseFloat(t.adherenceScore) : null
+      ]);
+      stmt.free();
+    } catch (err) {
+      console.error("insertTradeSql error:", err);
+    }
   }
 
   loadFromSqlite() {
     if (!this.db) return;
     
-    // Load Settings
-    const stmtSet = this.db.prepare("SELECT value FROM settings WHERE key = 'app_settings'");
-    if (stmtSet.step()) {
-      const row = stmtSet.getAsObject();
-      if (row.value) {
-        try {
-          this.settings = { ...this.settings, ...JSON.parse(row.value) };
-        } catch (e) {}
+    try {
+      // Load Settings
+      const stmtSet = this.db.prepare("SELECT value FROM settings WHERE key = 'app_settings'");
+      if (stmtSet.step()) {
+        const row = stmtSet.getAsObject();
+        if (row.value) {
+          try {
+            this.settings = { ...this.settings, ...JSON.parse(row.value) };
+          } catch (e) {}
+        }
       }
-    }
-    stmtSet.free();
+      stmtSet.free();
 
-    if (!this.settings.accounts) {
-      const oldBal = this.settings.startingBalance || 25000;
-      const oldFees = this.settings.defaultFees || 0;
-      this.settings.accounts = {
-        "Personal": { startingBalance: oldBal, defaultFees: oldFees },
-        "Prop Firm": { startingBalance: 50000, defaultFees: 1.50 }
-      };
-      this.settings.currentAccount = "Personal";
-    }
-
-    // Load Trades
-    const stmtTrades = this.db.prepare("SELECT * FROM trades ORDER BY exit_date_time DESC");
-    const loadedTrades = [];
-    while (stmtTrades.step()) {
-      const r = stmtTrades.getAsObject();
-      let checklist = null;
-      if (r.checklist_items) {
-        try { checklist = JSON.parse(r.checklist_items); } catch(e) {}
+      if (!this.settings.accounts) {
+        const oldBal = this.settings.startingBalance || 25000;
+        const oldFees = this.settings.defaultFees || 0;
+        this.settings.accounts = {
+          "Personal": { startingBalance: oldBal, defaultFees: oldFees },
+          "Prop Firm": { startingBalance: 50000, defaultFees: 1.50 }
+        };
+        this.settings.currentAccount = "Personal";
       }
-      loadedTrades.push({
-        id: r.id,
-        symbol: r.symbol,
-        direction: r.direction,
-        entryDateTime: r.entry_date_time,
-        exitDateTime: r.exit_date_time,
-        entryPrice: r.entry_price,
-        exitPrice: r.exit_price,
-        qty: r.qty,
-        stopLoss: r.stop_loss,
-        fees: r.fees,
-        setup: r.setup,
-        notes: r.notes,
-        lessons: r.lessons,
-        screenshotUrl: r.screenshot_url,
-        signalEntryPrice: r.signal_entry_price,
-        signalExitPrice: r.signal_exit_price,
-        accountId: r.account_id,
-        mistake: r.mistake,
-        assetClass: r.asset_class,
-        status: r.status,
-        overridePnl: r.override_pnl === 1,
-        manualPnl: r.manual_pnl,
-        interventionType: r.intervention_type,
-        maxPrice: r.max_price,
-        minPrice: r.min_price,
-        mfe: r.mfe,
-        mae: r.mae,
-        checklistItems: checklist,
-        adherenceScore: r.adherence_score
-      });
+
+      // Load Trades
+      const stmtTrades = this.db.prepare("SELECT * FROM trades ORDER BY exit_date_time DESC");
+      const loadedTrades = [];
+      while (stmtTrades.step()) {
+        const r = stmtTrades.getAsObject();
+        let checklist = null;
+        if (r.checklist_items) {
+          try { checklist = JSON.parse(r.checklist_items); } catch(e) {}
+        }
+        loadedTrades.push({
+          id: r.id,
+          symbol: r.symbol,
+          direction: r.direction,
+          entryDateTime: r.entry_date_time,
+          exitDateTime: r.exit_date_time,
+          entryPrice: r.entry_price,
+          exitPrice: r.exit_price,
+          qty: r.qty,
+          stopLoss: r.stop_loss,
+          fees: r.fees,
+          setup: r.setup,
+          notes: r.notes,
+          lessons: r.lessons,
+          screenshotUrl: r.screenshot_url,
+          screenshotUrl2: r.screenshot_url2 || "",
+          emotionTag: r.emotion_tag || "Disciplined",
+          executionScore: r.execution_score || "A",
+          signalEntryPrice: r.signal_entry_price,
+          signalExitPrice: r.signal_exit_price,
+          accountId: r.account_id,
+          mistake: r.mistake,
+          assetClass: r.asset_class,
+          status: r.status,
+          overridePnl: r.override_pnl === 1,
+          manualPnl: r.manual_pnl,
+          interventionType: r.intervention_type,
+          maxPrice: r.max_price,
+          minPrice: r.min_price,
+          mfe: r.mfe,
+          mae: r.mae,
+          checklistItems: checklist,
+          adherenceScore: r.adherence_score
+        });
+      }
+      stmtTrades.free();
+      this.trades = loadedTrades;
+      console.log(`Loaded ${loadedTrades.length} trades from SQLite WASM database.`);
+    } catch (err) {
+      console.error("loadFromSqlite error:", err);
     }
-    stmtTrades.free();
-    this.trades = loadedTrades;
   }
 
   loadFromStorage() {
