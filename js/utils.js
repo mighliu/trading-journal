@@ -68,7 +68,7 @@ export function getEffectiveMultiplier(trade) {
 }
 
 export function calcNetPnl(trade) {
-  if (trade.status === "skipped") return 0;
+  if (isSkippedTrade(trade)) return 0;
   if (trade.overridePnl && trade.manualPnl != null) {
     return parseFloat(trade.manualPnl) || 0;
   }
@@ -266,7 +266,7 @@ export function calcProfitFactor(trades) {
 export function calcWinRate(trades) {
   if (trades.length === 0) return 0;
   const wins = trades.filter(t => {
-    const pnl = t.status === "skipped" ? calcSignalPnl(t) : calcNetPnl(t);
+    const pnl = isSkippedTrade(t) ? calcSignalPnl(t) : calcNetPnl(t);
     return pnl > 0;
   }).length;
   return (wins / trades.length) * 100;
@@ -369,7 +369,7 @@ export function normalizeDateTime(dateVal) {
 }
 
 function getDailyReturns(trades, startingBalance = 25000) {
-  const sorted = [...trades].filter(t => t.status !== "skipped" && t.exitDateTime)
+  const sorted = [...trades].filter(t => !isSkippedTrade(t) && t.exitDateTime)
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
   if (sorted.length === 0) return [];
 
@@ -452,7 +452,7 @@ export function calcInterventionMetrics(trades) {
 
   for (const t of trades) {
     actualTotal += calcNetPnl(t);
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       if (t.signalEntryPrice != null && t.signalExitPrice != null) {
         strategyTotal += calcSignalPnl(t);
       }
@@ -473,7 +473,7 @@ export function calcInterventionMetrics(trades) {
 }
 
 export function hasSevereDeviation(trade) {
-  if (trade.status === "skipped") return true;
+  if (isSkippedTrade(trade)) return true;
   if (trade.overridePnl && trade.interventionType !== "followed") return true;
   return trade.interventionType != null && trade.interventionType !== "followed";
 }
@@ -490,7 +490,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
     const actPnl = calcNetPnl(t);
     const sigPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : actPnl;
     
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       if (sigPnl < 0) {
         // Skipped a loser = improved outcome
         improvedCount++;
@@ -520,7 +520,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   for (const t of trades) {
     const actNet = calcNetPnl(t);
     actualTotalPnl += actNet;
-    if (t.status === "executed") {
+    if (isExecutedTrade(t)) {
       if (actNet > 0) {
         actualWins++;
         actualGrossWins += actNet;
@@ -531,7 +531,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
     }
 
     let stratNet = 0;
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       stratNet = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : 0;
     } else {
       stratNet = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : actNet;
@@ -546,7 +546,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
     }
   }
 
-  const actualCount = trades.filter(t => t.status === "executed").length;
+  const actualCount = trades.filter(t => isExecutedTrade(t)).length;
   const strategyCount = trades.length;
 
   const actualWinRate = actualCount > 0 ? (actualWins / actualCount) * 100 : 0;
@@ -558,12 +558,12 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   const actualAvg = actualCount > 0 ? actualTotalPnl / actualCount : 0;
   const strategyAvg = strategyCount > 0 ? strategyTotalPnl / strategyCount : 0;
 
-  const actualSharpe = calcSharpeRatio(trades.filter(t => t.status === "executed"), startingBalance);
-  const actualSortino = calcSortinoRatio(trades.filter(t => t.status === "executed"), startingBalance);
+  const actualSharpe = calcSharpeRatio(trades.filter(t => isExecutedTrade(t)), startingBalance);
+  const actualSortino = calcSortinoRatio(trades.filter(t => isExecutedTrade(t)), startingBalance);
 
   const strategyTrades = trades.map(t => {
     let stratPnl = 0;
-    if (t.status === "skipped") {
+    if (isSkippedTrade(t)) {
       stratPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : 0;
     } else {
       stratPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : calcNetPnl(t);
@@ -582,7 +582,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   const strategySharpe = calcSharpeRatio(strategyTrades, startingBalance);
   const strategySortino = calcSortinoRatio(strategyTrades, startingBalance);
 
-  const actualDrawdown = calcMaxDrawdown(trades.filter(t => t.status === "executed"), startingBalance);
+  const actualDrawdown = calcMaxDrawdown(trades.filter(t => isExecutedTrade(t)), startingBalance);
   const strategyDrawdown = calcMaxDrawdown(strategyTrades, startingBalance);
 
   const actualExpectancy = actualCount > 0 ? actualTotalPnl / actualCount : 0;
@@ -655,7 +655,7 @@ export function calcMaxDrawdown(trades, startingBalance = 25000) {
 }
 
 export function calcMfePct(trade) {
-  if (!trade.entryPrice || trade.status === "skipped") return null;
+  if (!trade.entryPrice || isSkippedTrade(trade)) return null;
   const entry = parseFloat(trade.entryPrice);
   const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0) return null;
@@ -676,7 +676,7 @@ export function calcMfePct(trade) {
 }
 
 export function calcMaePct(trade) {
-  if (!trade.entryPrice || trade.status === "skipped") return null;
+  if (!trade.entryPrice || isSkippedTrade(trade)) return null;
   const entry = parseFloat(trade.entryPrice);
   const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0) return null;
@@ -697,7 +697,7 @@ export function calcMaePct(trade) {
 }
 
 export function calcMfe(trade) {
-  if (trade.status === "skipped") return null;
+  if (isSkippedTrade(trade)) return null;
   if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
     return parseFloat(trade.mfe);
   }
@@ -726,7 +726,7 @@ export function calcMfe(trade) {
 }
 
 export function calcMae(trade) {
-  if (trade.status === "skipped") return null;
+  if (isSkippedTrade(trade)) return null;
   if (trade.mae != null && !isNaN(parseFloat(trade.mae))) {
     return parseFloat(trade.mae);
   }
@@ -755,10 +755,10 @@ export function calcMae(trade) {
 }
 
 export function isRevengeTrade(trade, allTrades) {
-  if (trade.status !== "executed") return false;
+  if (!isExecutedTrade(trade)) return false;
   const accId = trade.accountId || "Personal";
   const sorted = [...allTrades]
-    .filter(t => t.status === "executed" && (t.accountId || "Personal") === accId)
+    .filter(t => isExecutedTrade(t) && (t.accountId || "Personal") === accId)
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
   const idx = sorted.findIndex(t => t.id === trade.id);
   if (idx <= 0) return false;
@@ -785,7 +785,7 @@ export function calcDailySequence(trades) {
   // Group trades by day (YYYY-MM-DD)
   const days = {};
   trades.forEach(t => {
-    if (t.status === "skipped" || !t.entryDateTime) return;
+    if (isSkippedTrade(t) || !t.entryDateTime) return;
     const dateStr = t.entryDateTime.split('T')[0];
     if (!days[dateStr]) days[dateStr] = [];
     days[dateStr].push(t);
@@ -804,7 +804,7 @@ export function calcDailySequence(trades) {
 
 export function calcPostLossPerformance(trades) {
   const sorted = [...trades]
-    .filter(t => t.status === "executed")
+    .filter(t => isExecutedTrade(t))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
     
   let afterWinCount = 0;
@@ -850,7 +850,7 @@ export function calcPostLossPerformance(trades) {
 
 export function calcDrawdownDurations(trades, startingBalance = 25000) {
   const sorted = [...trades]
-    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .filter(t => !isSkippedTrade(t))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
     
   if (sorted.length === 0) {
@@ -956,10 +956,10 @@ export function calcDrawdownDurations(trades, startingBalance = 25000) {
 }
 
 export function calcStreakProbability(trades) {
-  const count = trades.filter(t => t.status === "executed").length;
+  const count = trades.filter(t => isExecutedTrade(t)).length;
   if (count === 0) return { expectedWin: 0, expectedLoss: 0, actualWin: 0, actualLoss: 0 };
   
-  const winRate = calcWinRate(trades.filter(t => t.status === "executed")) / 100;
+  const winRate = calcWinRate(trades.filter(t => isExecutedTrade(t))) / 100;
   const lossRate = 1 - winRate;
   
   // Expected streak lengths based on geometric/streak approximation formula:
@@ -980,7 +980,7 @@ export function calcStreakProbability(trades) {
 
 export function calcAdvancedDrawdownMetrics(trades, startingBalance = 25000) {
   const sorted = [...trades]
-    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .filter(t => !isSkippedTrade(t))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
     
   if (sorted.length === 0) {
@@ -1126,7 +1126,7 @@ export function calcAdvancedDrawdownMetrics(trades, startingBalance = 25000) {
 
 export function calcDrawdownContributions(trades, startingBalance = 25000) {
   const sorted = [...trades]
-    .filter(t => t.status !== "skipped" && t.status !== "draft")
+    .filter(t => !isSkippedTrade(t))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sorted.length === 0) {
@@ -1226,7 +1226,7 @@ export function calcDrawdownContributions(trades, startingBalance = 25000) {
 }
 
 export function calcHoldTimeDiagnostics(trades) {
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => !isSkippedTrade(t));
   
   let winSum = 0;
   let winCount = 0;
@@ -1259,7 +1259,7 @@ export function calcHoldTimeDiagnostics(trades) {
 }
 
 export function calcFatiguePivotData(trades) {
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => !isSkippedTrade(t));
   
   const dayGroups = {};
   executed.forEach(t => {
@@ -1325,7 +1325,7 @@ export function calcFatiguePivotData(trades) {
 }
 
 export function calcSetupMistakeMatrix(trades) {
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => !isSkippedTrade(t));
   
   const setups = [...new Set(executed.map(t => t.setup || "Unspecified"))].sort();
   const mistakes = [...new Set(executed.map(t => t.mistake || "None"))].sort();
@@ -1365,7 +1365,7 @@ export function calcSetupMistakeMatrix(trades) {
 }
 
 export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns = 500, horizon = 50) {
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => !isSkippedTrade(t));
   if (executed.length === 0) {
     return {
       runs: [],
@@ -1429,7 +1429,7 @@ export function runMonteCarloSimulation(trades, startingBalance = 25000, numRuns
 }
 
 export function calcPsychologyAnalytics(trades) {
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => !isSkippedTrade(t));
   
   const emotionStats = {};
   const gradeStats = {};
@@ -1462,7 +1462,7 @@ export function calcPsychologyAnalytics(trades) {
 }
 
 export function generateEdgeInsights(trades) {
-  const executed = trades.filter(t => t.status !== "skipped" && t.status !== "draft");
+  const executed = trades.filter(t => !isSkippedTrade(t));
   if (executed.length < 3) {
     return [
       { type: "info", title: "Log More Trades", message: "Complete at least 3 executed trades to unlock automated edge detection & leak analysis." }
