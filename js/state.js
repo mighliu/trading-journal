@@ -1419,8 +1419,32 @@ class StateManager {
         const qty = parseFloat(qtyCol !== -1 ? (entryRow[qtyCol] || exitRow[qtyCol]) : 1) || 1;
 
         const manualPnl = profitCol !== -1 && exitRow[profitCol] !== "" ? parseFloat(exitRow[profitCol]) : null;
-        const mfeVal = runUpCol !== -1 && exitRow[runUpCol] !== "" ? Math.abs(parseFloat(exitRow[runUpCol])) : null;
-        const maeVal = drawdownCol !== -1 && exitRow[drawdownCol] !== "" ? Math.abs(parseFloat(exitRow[drawdownCol])) : null;
+        
+        let mfeVal = null;
+        if (runUpCol !== -1 && exitRow[runUpCol] != null && exitRow[runUpCol] !== "") {
+          const rawMfeStr = String(exitRow[runUpCol]).trim();
+          const mult = getSymbolMultiplier(symbol);
+          if (rawMfeStr.includes("%")) {
+            const pct = Math.abs(parseFloat(rawMfeStr));
+            if (!isNaN(pct)) mfeVal = (pct / 100) * (entryPrice * qty * mult);
+          } else {
+            const parsedNum = Math.abs(parseFloat(rawMfeStr.replace(/[^0-9.-]/g, "")));
+            if (!isNaN(parsedNum)) mfeVal = parsedNum;
+          }
+        }
+
+        let maeVal = null;
+        if (drawdownCol !== -1 && exitRow[drawdownCol] != null && exitRow[drawdownCol] !== "") {
+          const rawMaeStr = String(exitRow[drawdownCol]).trim();
+          const mult = getSymbolMultiplier(symbol);
+          if (rawMaeStr.includes("%")) {
+            const pct = Math.abs(parseFloat(rawMaeStr));
+            if (!isNaN(pct)) maeVal = (pct / 100) * (entryPrice * qty * mult);
+          } else {
+            const parsedNum = Math.abs(parseFloat(rawMaeStr.replace(/[^0-9.-]/g, "")));
+            if (!isNaN(parsedNum)) maeVal = parsedNum;
+          }
+        }
 
         const setupName = setupCol !== -1 && entryRow[setupCol] ? String(entryRow[setupCol]).trim() : "TradingView Strategy";
         const notesStr = notesCol !== -1 && entryRow[notesCol] ? String(entryRow[notesCol]).trim() : ("Imported from TradingView (Trade #" + tNum + ")");
