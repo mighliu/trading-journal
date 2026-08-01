@@ -1,7 +1,4 @@
-import {
-  renderMonteCarloChart,
-  renderEdgeInsights,
-  renderPsychologyAnalyticsCard, AppState } from './state.js';
+import { AppState } from './state.js';
 import { demoTrades } from '../demo-data.js';
 import { 
   renderStatsBanner, 
@@ -12,7 +9,9 @@ import {
   showToast,
   renderInterventionMatrix,
   renderRiskTab,
-  renderAnalyticsTab
+  renderAnalyticsTab,
+  renderEdgeInsights,
+  renderPsychologyAnalyticsCard
 } from './ui.js';
 import { 
   renderCalendar, 
@@ -25,31 +24,30 @@ import {
   renderDayOfWeekChart, 
   renderSetupTagChart, 
   renderSymbolChart, 
-  renderDistributionChart,
-  renderMistakeChart,
+  renderDistributionChart, 
+  renderMistakeChart, 
   renderSlippageSymbolChart,
   renderHourPnlChart,
   renderCumulativeSlippageChart,
   renderAssetClassChart,
+  renderHoldTimeChart,
+  renderHoldTimeScatterChart,
+  renderFatiguePivotChart,
+  renderTradeSequenceChart,
   renderInterventionChart,
   renderInterventionAttributionChart,
   renderInterventionHourlyChart,
   renderInterventionStreakChart,
   renderAdherenceDrawdownChart,
-  renderHoldTimeChart,
-  destroyAllCharts,
   renderMfeMaeCharts,
   renderRMultipleChart,
   renderRollingPerformanceChart,
-  renderTradeSequenceChart,
-  renderPostLossBehaviorChart,
   renderTimelineReplayChart,
   renderAdherencePerformanceChart,
   renderDrawdownScatterChart,
-  renderHoldTimeScatterChart,
-  renderFatiguePivotChart
+  renderMonteCarloChart
 } from './charts.js';
-import { hasSevereDeviation } from './utils.js';
+import { compressImage } from './utils.js';
 
 let currentTab = "dashboard";
 const calendarToday = new Date("2026-06-29T17:34:00"); // Base date context

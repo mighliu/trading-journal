@@ -1,8 +1,4 @@
-import {
-  renderMonteCarloChart,
-  generateEdgeInsights,
-  calcPsychologyAnalytics,
-  compressImage, AppState } from './state.js';
+import { AppState } from './state.js';
 import { closeDayPanel } from './calendar.js';
 import { 
   calcNetPnl, 
@@ -23,6 +19,9 @@ import {
   calcSortinoRatio,
   getSymbolMultiplier,
   calcInterventionAnalytics,
+  generateEdgeInsights,
+  calcPsychologyAnalytics,
+  compressImage,
   calcMaxDrawdown,
   isRevengeTrade,
   calcDrawdownDurations,
@@ -35,6 +34,7 @@ import {
   calcFatiguePivotData,
   calcSetupMistakeMatrix
 } from './utils.js';
+import { renderMonteCarloChart } from './charts.js';
 
 let currentEditId = null;
 let currentDirection = "long"; // long by default
