@@ -50,6 +50,65 @@ async function saveDbBinaryToIndexedDB(uint8Array) {
   }
 }
 
+export const BROKER_PRESETS = {
+  auto: null,
+  tradovate: {
+    symbol: ["contract", "symbol", "instrument", "product"],
+    direction: ["buy/sell", "action", "b/s", "side", "type"],
+    entryPrice: ["avg fill price", "price", "buy price", "fill price", "price usd"],
+    exitPrice: ["sell price", "close price", "exit price"],
+    qty: ["qty", "contracts", "size", "amount"],
+    entryDate: ["timestamp", "fill time", "order time", "date and time", "time"],
+    exitDate: ["close time", "exit time", "closed"],
+    pnl: ["p/l", "realized p/l", "net p/l", "profit usd", "net pnl"],
+    fees: ["commissions", "fees", "comm"]
+  },
+  rithmic: {
+    symbol: ["instrument", "symbol", "contract"],
+    direction: ["buy/sell", "market pos.", "type", "side", "direction"],
+    entryPrice: ["entry price", "avg fill", "open price"],
+    exitPrice: ["exit price", "close price"],
+    qty: ["qty", "size", "contracts"],
+    entryDate: ["entry time", "open time", "time"],
+    exitDate: ["exit time", "close time"],
+    pnl: ["pnl", "net pnl", "profit", "realized pnl"],
+    fees: ["commission", "fee", "comm"]
+  },
+  ibkr: {
+    symbol: ["symbol", "financial instrument"],
+    direction: ["buy/sell", "side", "code"],
+    entryPrice: ["t. price", "trade price", "price"],
+    exitPrice: ["close price"],
+    qty: ["quantity", "qty", "shares"],
+    entryDate: ["date/time", "trade date", "date"],
+    exitDate: ["close date"],
+    pnl: ["realized pnl", "fifo pnl", "pnl"],
+    fees: ["comm/fee", "commission"]
+  },
+  tradestation: {
+    symbol: ["symbol", "asset"],
+    direction: ["type", "side"],
+    entryPrice: ["price", "entry price"],
+    exitPrice: ["exit price"],
+    qty: ["qty", "shares", "contracts"],
+    entryDate: ["entry time", "date"],
+    exitDate: ["exit time"],
+    pnl: ["total net profit", "p/l", "net profit"],
+    fees: ["commission", "fees"]
+  },
+  metatrader: {
+    symbol: ["item", "symbol"],
+    direction: ["type", "side"],
+    entryPrice: ["open price", "price"],
+    exitPrice: ["close price"],
+    qty: ["size", "lots", "volume"],
+    entryDate: ["open time", "time"],
+    exitDate: ["close time"],
+    pnl: ["profit", "pnl"],
+    fees: ["commission", "taxes", "swap"]
+  }
+};
+
 class StateManager {
   constructor() {
     this.listeners = [];
@@ -244,7 +303,7 @@ class StateManager {
     if (!this.db) return;
     
     try {
-      // Load Settings
+      // 1. Load Settings from SQLite & sync with localStorage
       const stmtSet = this.db.prepare("SELECT value FROM settings WHERE key = 'app_settings'");
       if (stmtSet.step()) {
         const row = stmtSet.getAsObject();
@@ -256,6 +315,15 @@ class StateManager {
       }
       stmtSet.free();
 
+      // Check localStorage for any newer settings overrides
+      const storedSettings = localStorage.getItem("tf_settings");
+      if (storedSettings) {
+        try {
+          const lsSet = JSON.parse(storedSettings);
+          this.settings = { ...this.settings, ...lsSet };
+        } catch (e) {}
+      }
+
       if (!this.settings.accounts) {
         const oldBal = this.settings.startingBalance || 25000;
         const oldFees = this.settings.defaultFees || 0;
@@ -266,7 +334,7 @@ class StateManager {
         this.settings.currentAccount = "Personal";
       }
 
-      // Load Trades
+      // 2. Load Trades from SQLite
       const stmtTrades = this.db.prepare("SELECT * FROM trades ORDER BY exit_date_time DESC");
       const loadedTrades = [];
       while (stmtTrades.step()) {
@@ -295,13 +363,13 @@ class StateManager {
           executionScore: r.execution_score || "A",
           signalEntryPrice: r.signal_entry_price,
           signalExitPrice: r.signal_exit_price,
-          accountId: r.account_id,
-          mistake: r.mistake,
-          assetClass: r.asset_class,
-          status: r.status,
+          accountId: r.account_id || "Personal",
+          mistake: r.mistake || "",
+          assetClass: r.asset_class || "stocks",
+          status: r.status || "executed",
           overridePnl: r.override_pnl === 1,
           manualPnl: r.manual_pnl,
-          interventionType: r.intervention_type,
+          interventionType: r.intervention_type || "followed",
           maxPrice: r.max_price,
           minPrice: r.min_price,
           mfe: r.mfe,
@@ -311,13 +379,31 @@ class StateManager {
         });
       }
       stmtTrades.free();
-      if (loadedTrades.length > 0) {
-        this.trades = loadedTrades;
-        console.log(`Loaded ${loadedTrades.length} trades from SQLite WASM database.`);
-        this.sanitizeLoadedTrades();
-      } else {
-        this.loadFromStorage();
+
+      // 3. Merge with localStorage trades to ensure zero data loss
+      let lsTrades = [];
+      const storedTrades = localStorage.getItem("tf_trades");
+      if (storedTrades) {
+        try {
+          lsTrades = JSON.parse(storedTrades) || [];
+        } catch (e) {}
       }
+
+      // Combine loadedTrades and lsTrades, avoiding duplicates
+      const mergedMap = new Map();
+      loadedTrades.forEach(t => mergedMap.set(t.id, t));
+      lsTrades.forEach(t => {
+        if (t && t.id && !mergedMap.has(t.id)) {
+          mergedMap.set(t.id, t);
+          this.insertTradeSql(t); // re-sync missing trade back to SQLite
+        }
+      });
+
+      this.trades = Array.from(mergedMap.values()).sort((a, b) => {
+        return new Date(b.exitDateTime) - new Date(a.exitDateTime);
+      });
+
+      console.log(`Successfully synchronized ${this.trades.length} trades across SQLite WASM and localStorage.`);
     } catch (err) {
       console.error("loadFromSqlite error:", err);
       this.loadFromStorage();
@@ -332,7 +418,6 @@ class StateManager {
       } else {
         this.trades = [];
       }
-      this.sanitizeLoadedTrades();
 
       const storedSettings = localStorage.getItem("tf_settings");
       if (storedSettings) {
@@ -369,112 +454,7 @@ class StateManager {
       }
     } catch (e) {
       console.error("Failed to load from localStorage:", e);
-      if (!Array.isArray(this.trades)) this.trades = [];
-    }
-  }
-
-  sanitizeLoadedTrades() {
-    if (!Array.isArray(this.trades) || this.trades.length === 0) return;
-
-    // Deduplicate loaded trades by ID and composite fingerprint
-    const seenIds = new Set();
-    const seenFingerprints = new Set();
-    const uniqueTrades = [];
-    let dupsRemoved = 0;
-
-    this.trades.forEach(t => {
-      if (!t) return;
-      const entryTs = t.entryDateTime ? new Date(t.entryDateTime).getTime() : 0;
-      const exitTs = t.exitDateTime ? new Date(t.exitDateTime).getTime() : entryTs;
-      const idStr = t.id || null;
-      const fp = `${t.symbol}_${t.direction}_${Math.round(entryTs / 1000)}_${Math.round(exitTs / 1000)}_${t.entryPrice}_${t.exitPrice}_${t.qty}_${t.accountId || "Personal"}`;
-
-      if (idStr && seenIds.has(idStr)) {
-        dupsRemoved++;
-        if (this.db && t.id) {
-          try { this.db.run("DELETE FROM trades WHERE id = ?", [t.id]); } catch(e) {}
-        }
-        return;
-      }
-      if (seenFingerprints.has(fp)) {
-        dupsRemoved++;
-        if (this.db && t.id) {
-          try { this.db.run("DELETE FROM trades WHERE id = ?", [t.id]); } catch(e) {}
-        }
-        return;
-      }
-
-      if (idStr) seenIds.add(idStr);
-      seenFingerprints.add(fp);
-      uniqueTrades.push(t);
-    });
-
-    if (dupsRemoved > 0) {
-      console.log(`Deduplicated ${dupsRemoved} duplicate trades on startup.`);
-      this.trades = uniqueTrades;
-    }
-
-    let fixedCount = 0;
-    this.trades.forEach(t => {
-      let modified = false;
-      const entry = parseFloat(t.entryPrice) || 0;
-      const exit = parseFloat(t.exitPrice) || entry;
-      if (entry > 0) {
-        let maxP = t.maxPrice != null ? parseFloat(t.maxPrice) : null;
-        let minP = t.minPrice != null ? parseFloat(t.minPrice) : null;
-
-        // If maxPrice or minPrice is absurdly out of range (> 1.35x or < 0.5x entry price), reset it
-        if (maxP != null && (maxP > entry * 1.35 || maxP < entry * 0.5)) {
-          maxP = null;
-          modified = true;
-        }
-        if (minP != null && (minP > entry * 1.35 || minP < entry * 0.5)) {
-          minP = null;
-          modified = true;
-        }
-
-        if (maxP == null || minP == null) {
-          const higher = Math.max(entry, exit);
-          const lower = Math.min(entry, exit);
-          const diff = higher - lower;
-          
-          if (t.direction === "long") {
-            maxP = parseFloat((higher + (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
-            minP = parseFloat((lower - (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
-          } else {
-            minP = parseFloat((lower - (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
-            maxP = parseFloat((higher + (diff > 0 ? diff * 0.15 : entry * 0.002)).toFixed(2));
-          }
-          t.maxPrice = maxP;
-          t.minPrice = minP;
-          modified = true;
-        }
-      }
-
-      if (t.mfe != null && parseFloat(t.mfe) > 20000) {
-        t.mfe = null;
-        modified = true;
-      }
-      if (t.mae != null && parseFloat(t.mae) > 20000) {
-        t.mae = null;
-        modified = true;
-      }
-
-      if (modified) {
-        fixedCount++;
-        if (this.db && t.id) {
-          try {
-            this.db.run(
-              "UPDATE trades SET max_price = ?, min_price = ?, mfe = ?, mae = ? WHERE id = ?",
-              [t.maxPrice, t.minPrice, t.mfe, t.mae, t.id]
-            );
-          } catch(e) {}
-        }
-      }
-    });
-
-    if (fixedCount > 0) {
-      console.log(`Sanitized MFE/MAE price bounds for ${fixedCount} trades.`);
+      this.trades = [];
     }
   }
 
@@ -572,6 +552,7 @@ class StateManager {
     }
     this.trades.unshift(trade);
     this.saveToStorage();
+    this.notify();
     return trade;
   }
 
@@ -616,6 +597,7 @@ class StateManager {
     }
     this.trades[idx] = updated;
     this.saveToStorage();
+    this.notify();
     return this.trades[idx];
   }
 
@@ -745,24 +727,8 @@ class StateManager {
         assetClass = "options";
       }
 
-      let maxPrice = t.maxPrice != null ? parseFloat(t.maxPrice) : null;
-      let minPrice = t.minPrice != null ? parseFloat(t.minPrice) : null;
-
-      // Sanity check price bounds: maxPrice and minPrice MUST be asset prices near entryPrice
-      if (t.entryPrice > 0) {
-        if (maxPrice != null && (maxPrice > t.entryPrice * 1.35 || maxPrice < t.entryPrice * 0.5)) {
-          maxPrice = null;
-        }
-        if (minPrice != null && (minPrice > t.entryPrice * 1.35 || minPrice < t.entryPrice * 0.5)) {
-          minPrice = null;
-        }
-      }
-
-      let mfe = t.mfe != null ? parseFloat(t.mfe) : null;
-      let mae = t.mae != null ? parseFloat(t.mae) : null;
-      if (mfe != null && mfe > 20000) mfe = null;
-      if (mae != null && mae > 20000) mae = null;
-
+      let maxPrice = t.maxPrice;
+      let minPrice = t.minPrice;
       if (maxPrice == null || minPrice == null) {
         const higher = Math.max(t.entryPrice, t.exitPrice);
         const lower = Math.min(t.entryPrice, t.exitPrice);
@@ -813,8 +779,8 @@ class StateManager {
         interventionType: t.interventionType || "followed",
         maxPrice,
         minPrice,
-        mfe,
-        mae,
+        mfe: t.mfe != null ? parseFloat(t.mfe) : null,
+        mae: t.mae != null ? parseFloat(t.mae) : null,
         checklistItems: t.checklistItems || null,
         adherenceScore: t.adherenceScore !== undefined ? t.adherenceScore : null
       };
@@ -907,7 +873,7 @@ class StateManager {
         const s = String(t.status || "executed").toLowerCase().trim();
         const targetS = String(this.activeFilters.status).toLowerCase().trim();
         if (targetS === "executed") {
-          return s === "executed" || s === "closed" || s === "filled" || s === "taken" || s === "win" || s === "loss" || s === "";
+          return s !== "skipped" && s !== "cancelled" && s !== "canceled" && s !== "rejected" && s !== "invalid";
         }
         if (targetS === "skipped") {
           return s === "skipped" || s === "cancelled" || s === "canceled" || s === "rejected" || s === "invalid";
@@ -1114,7 +1080,7 @@ class StateManager {
     });
   }
 
-  importCSV(file) {
+  importCSV(file, brokerKey = "auto") {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -1152,7 +1118,16 @@ class StateManager {
           };
 
           const headerRow = parseCsvLine(lines[0]).map(h => h.toLowerCase().trim());
-          const getColIdx = (name) => headerRow.findIndex(h => h.includes(name));
+          const preset = BROKER_PRESETS[brokerKey];
+
+          const getColIdx = (fieldName, defaultAliases = [fieldName]) => {
+            const aliases = (preset && preset[fieldName]) ? preset[fieldName] : defaultAliases;
+            for (const alias of aliases) {
+              const idx = headerRow.findIndex(h => h.includes(alias));
+              if (idx !== -1) return idx;
+            }
+            return -1;
+          };
 
           const dataRows = lines.slice(1);
           let addedCount = 0;
@@ -1446,8 +1421,32 @@ class StateManager {
         const qty = parseFloat(qtyCol !== -1 ? (entryRow[qtyCol] || exitRow[qtyCol]) : 1) || 1;
 
         const manualPnl = profitCol !== -1 && exitRow[profitCol] !== "" ? parseFloat(exitRow[profitCol]) : null;
-        const mfeVal = runUpCol !== -1 && exitRow[runUpCol] !== "" ? Math.abs(parseFloat(exitRow[runUpCol])) : null;
-        const maeVal = drawdownCol !== -1 && exitRow[drawdownCol] !== "" ? Math.abs(parseFloat(exitRow[drawdownCol])) : null;
+        
+        let mfeVal = null;
+        if (runUpCol !== -1 && exitRow[runUpCol] != null && exitRow[runUpCol] !== "") {
+          const rawMfeStr = String(exitRow[runUpCol]).trim();
+          const mult = getSymbolMultiplier(symbol);
+          if (rawMfeStr.includes("%")) {
+            const pct = Math.abs(parseFloat(rawMfeStr));
+            if (!isNaN(pct)) mfeVal = (pct / 100) * (entryPrice * qty * mult);
+          } else {
+            const parsedNum = Math.abs(parseFloat(rawMfeStr.replace(/[^0-9.-]/g, "")));
+            if (!isNaN(parsedNum)) mfeVal = parsedNum;
+          }
+        }
+
+        let maeVal = null;
+        if (drawdownCol !== -1 && exitRow[drawdownCol] != null && exitRow[drawdownCol] !== "") {
+          const rawMaeStr = String(exitRow[drawdownCol]).trim();
+          const mult = getSymbolMultiplier(symbol);
+          if (rawMaeStr.includes("%")) {
+            const pct = Math.abs(parseFloat(rawMaeStr));
+            if (!isNaN(pct)) maeVal = (pct / 100) * (entryPrice * qty * mult);
+          } else {
+            const parsedNum = Math.abs(parseFloat(rawMaeStr.replace(/[^0-9.-]/g, "")));
+            if (!isNaN(parsedNum)) maeVal = parsedNum;
+          }
+        }
 
         const setupName = setupCol !== -1 && entryRow[setupCol] ? String(entryRow[setupCol]).trim() : "TradingView Strategy";
         const notesStr = notesCol !== -1 && entryRow[notesCol] ? String(entryRow[notesCol]).trim() : ("Imported from TradingView (Trade #" + tNum + ")");
@@ -1467,8 +1466,8 @@ class StateManager {
           notes: notesStr,
           lessons: "",
           screenshotUrl: "",
-          signalEntryPrice: entryPrice,
-          signalExitPrice: exitPrice,
+          signalEntryPrice: null,
+          signalExitPrice: null,
           accountId: targetAccount,
           mistake: "",
           assetClass: symbol.startsWith("MNQ") || symbol.startsWith("NQ") || symbol.startsWith("ES") ? "futures" : "stocks",
@@ -1478,8 +1477,8 @@ class StateManager {
           interventionType: "followed",
           maxPrice: null,
           minPrice: null,
-          mfe: mfeVal != null && mfeVal < 20000 ? mfeVal : null,
-          mae: maeVal != null && maeVal < 20000 ? maeVal : null
+          mfe: mfeVal,
+          mae: maeVal
         });
       }
     } else {
@@ -1505,8 +1504,6 @@ class StateManager {
         const targetAccount = (rowAccount && rowAccount !== "" && rowAccount.toLowerCase() !== "undefined") ? rowAccount : activeAccount;
 
         const manualPnl = profitCol !== -1 && row[profitCol] !== "" ? parseFloat(row[profitCol]) : null;
-        const rowRunUp = runUpCol !== -1 && row[runUpCol] !== "" ? Math.abs(parseFloat(row[runUpCol])) : null;
-        const rowDrawdown = drawdownCol !== -1 && row[drawdownCol] !== "" ? Math.abs(parseFloat(row[drawdownCol])) : null;
 
         parsedTrades.push({
           id: "trade_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9),
@@ -1523,8 +1520,8 @@ class StateManager {
           notes: notesCol !== -1 && row[notesCol] ? String(row[notesCol]).trim() : "",
           lessons: "",
           screenshotUrl: "",
-          signalEntryPrice: entryPrice,
-          signalExitPrice: exitPrice,
+          signalEntryPrice: null,
+          signalExitPrice: null,
           accountId: targetAccount,
           mistake: mistakeCol !== -1 && row[mistakeCol] ? String(row[mistakeCol]).trim() : "",
           assetClass: assetClassCol !== -1 && row[assetClassCol] ? String(row[assetClassCol]).trim() : "stocks",
@@ -1532,10 +1529,10 @@ class StateManager {
           overridePnl: manualPnl != null,
           manualPnl: manualPnl,
           interventionType: "followed",
-          maxPrice: null,
-          minPrice: null,
-          mfe: rowRunUp != null && rowRunUp < 20000 ? rowRunUp : null,
-          mae: rowDrawdown != null && rowDrawdown < 20000 ? rowDrawdown : null
+          maxPrice: runUpCol !== -1 && row[runUpCol] !== "" ? parseFloat(row[runUpCol]) : null,
+          minPrice: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null,
+          mfe: runUpCol !== -1 && row[runUpCol] !== "" ? parseFloat(row[runUpCol]) : null,
+          mae: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null
         });
       }
     }

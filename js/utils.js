@@ -88,17 +88,88 @@ export function calcPnlPercent(trade) {
 }
 
 export function calcSignalPnl(trade) {
+  if (!trade) return 0;
+  const type = trade.interventionType || "followed";
+  const actPnl = calcNetPnl(trade);
+
+  // 1. Followed trades (no intervention): Mechanical Strategy P&L is identical to Actual P&L
+  if ((type === "followed" || !type) && !isSkippedTrade(trade)) {
+    return actPnl;
+  }
+
   const qty = parseFloat(trade.qty) || 0;
-  const signalEntry = parseFloat(trade.signalEntryPrice);
-  const entry = !isNaN(signalEntry) ? signalEntry : (parseFloat(trade.entryPrice) || 0);
-  const signalExit = parseFloat(trade.signalExitPrice);
-  const exit = !isNaN(signalExit) ? signalExit : (parseFloat(trade.exitPrice) || 0);
-  const directionMultiplier = trade.direction === "long" ? 1 : -1;
+  const entry = parseFloat(trade.entryPrice) || 0;
+  const exit = parseFloat(trade.exitPrice) || entry;
+  const direction = String(trade.direction || "long").toLowerCase();
+  const dirMult = direction === "short" ? -1 : 1;
   const fees = parseFloat(trade.fees) || 0;
+  const mult = getEffectiveMultiplier(trade);
 
-  let multiplier = getEffectiveMultiplier(trade);
+  // 2. Discretionary trade taken with NO strategy signal
+  if (type === "manual_no_signal") {
+    return 0; // Mechanical strategy rule generated $0 P&L (did not take trade)
+  }
 
-  return (exit - entry) * qty * multiplier * directionMultiplier - fees;
+  // 3. Skipped Trades (Strategy executed trade, trader skipped it)
+  if (isSkippedTrade(trade)) {
+    if (exit !== 0 && entry !== 0) {
+      return (exit - entry) * qty * mult * dirMult - fees;
+    }
+    return 0;
+  }
+
+  // 4. Early Profit Cut (Profit Protect)
+  if (type === "early_profit") {
+    const mfeRaw = parseFloat(trade.mfe != null ? trade.mfe : trade.maxPrice);
+    if (!isNaN(mfeRaw) && mfeRaw > 0) {
+      if (entry > 0 && mfeRaw > entry * 0.1 && mfeRaw < entry * 3) {
+        const pts = direction === "long" ? Math.max(0, mfeRaw - entry) : Math.max(0, entry - mfeRaw);
+        return pts * qty * mult - fees;
+      } else {
+        return mfeRaw - fees;
+      }
+    }
+    return actPnl > 0 ? actPnl * 1.25 : Math.abs(actPnl) * 1.25;
+  }
+
+  // 5. Early Loss Cut (Loss Stop)
+  if (type === "early_loss") {
+    const stopRaw = parseFloat(trade.stopLoss);
+    if (!isNaN(stopRaw) && stopRaw > 0) {
+      if (entry > 0 && stopRaw > entry * 0.1 && stopRaw < entry * 3) {
+        const pts = direction === "long" ? Math.max(0, entry - stopRaw) : Math.max(0, stopRaw - entry);
+        return -(pts * qty * mult + fees);
+      } else {
+        return -(stopRaw + fees);
+      }
+    }
+    const maeRaw = parseFloat(trade.mae != null ? trade.mae : trade.minPrice);
+    if (!isNaN(maeRaw) && maeRaw > 0) {
+      if (entry > 0 && maeRaw > entry * 0.1 && maeRaw < entry * 3) {
+        const pts = direction === "long" ? Math.max(0, entry - maeRaw) : Math.max(0, maeRaw - entry);
+        return -(pts * qty * mult + fees);
+      } else {
+        return -(maeRaw + fees);
+      }
+    }
+    return actPnl < 0 ? actPnl * 1.25 : -Math.abs(actPnl || 100);
+  }
+
+  // 6. Late Entry Chase
+  if (type === "late_entry") {
+    const sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
+    return (exit - sigEntry) * qty * mult * dirMult - fees;
+  }
+
+  // 7. Explicit signal prices provided as fallback
+  if (trade.signalEntryPrice != null && trade.signalExitPrice != null &&
+      !isNaN(parseFloat(trade.signalEntryPrice)) && !isNaN(parseFloat(trade.signalExitPrice))) {
+    const sigEntry = parseFloat(trade.signalEntryPrice);
+    const sigExit = parseFloat(trade.signalExitPrice);
+    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+  }
+
+  return actPnl;
 }
 
 export function calcPriceDiff(p1, p2) {
@@ -306,10 +377,10 @@ export function getDateRange(preset, baseDate = new Date()) {
       start.setHours(0, 0, 0, 0);
       break;
     case "allTime":
-      return { start: new Date(0), end };
+      return { start: new Date(0), end: new Date(8640000000000000) };
     default:
       // Default to allTime if preset not recognized
-      return { start: new Date(0), end };
+      return { start: new Date(0), end: new Date(8640000000000000) };
   }
   
   return { start, end };
@@ -452,17 +523,7 @@ export function calcInterventionMetrics(trades) {
 
   for (const t of trades) {
     actualTotal += calcNetPnl(t);
-    if (isSkippedTrade(t)) {
-      if (t.signalEntryPrice != null && t.signalExitPrice != null) {
-        strategyTotal += calcSignalPnl(t);
-      }
-    } else {
-      if (t.signalEntryPrice != null && t.signalExitPrice != null) {
-        strategyTotal += calcSignalPnl(t);
-      } else {
-        strategyTotal += calcNetPnl(t);
-      }
-    }
+    strategyTotal += calcSignalPnl(t);
   }
 
   return {
@@ -488,7 +549,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
 
   for (const t of intervenedTrades) {
     const actPnl = calcNetPnl(t);
-    const sigPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : actPnl;
+    const sigPnl = calcSignalPnl(t);
     
     if (isSkippedTrade(t)) {
       if (sigPnl < 0) {
@@ -530,12 +591,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
       }
     }
 
-    let stratNet = 0;
-    if (isSkippedTrade(t)) {
-      stratNet = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : 0;
-    } else {
-      stratNet = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : actNet;
-    }
+    const stratNet = calcSignalPnl(t);
     strategyTotalPnl += stratNet;
     if (stratNet > 0) {
       strategyWins++;
@@ -547,7 +603,7 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   }
 
   const actualCount = trades.filter(t => isExecutedTrade(t)).length;
-  const strategyCount = trades.length;
+  const strategyCount = trades.filter(t => t.interventionType !== "manual_no_signal").length;
 
   const actualWinRate = actualCount > 0 ? (actualWins / actualCount) * 100 : 0;
   const strategyWinRate = strategyCount > 0 ? (strategyWins / strategyCount) * 100 : 0;
@@ -562,21 +618,14 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   const actualSortino = calcSortinoRatio(trades.filter(t => isExecutedTrade(t)), startingBalance);
 
   const strategyTrades = trades.map(t => {
-    let stratPnl = 0;
-    if (isSkippedTrade(t)) {
-      stratPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : 0;
-    } else {
-      stratPnl = t.signalEntryPrice != null && t.signalExitPrice != null ? calcSignalPnl(t) : calcNetPnl(t);
-    }
+    const stratPnl = calcSignalPnl(t);
     return {
+      ...t,
       status: "executed",
-      direction: "long",
-      entryPrice: stratPnl >= 0 ? 0 : 1,
-      exitPrice: stratPnl >= 0 ? 1 : 0,
-      qty: Math.abs(stratPnl),
+      overridePnl: true,
+      manualPnl: stratPnl,
       fees: 0,
-      symbol: "STRAT",
-      entryDateTime: t.entryDateTime
+      exitDateTime: t.exitDateTime || t.entryDateTime
     };
   });
   const strategySharpe = calcSharpeRatio(strategyTrades, startingBalance);
@@ -654,29 +703,22 @@ export function calcMaxDrawdown(trades, startingBalance = 25000) {
   };
 }
 
-function isPlausiblePrice(price, refPrice) {
-  if (!price || !refPrice || isNaN(price) || isNaN(refPrice) || refPrice <= 0) return false;
-  return price >= refPrice * 0.5 && price <= refPrice * 1.35;
-}
-
 export function calcMfePct(trade) {
   if (!trade.entryPrice || isSkippedTrade(trade)) return null;
   const entry = parseFloat(trade.entryPrice);
-  const exit = parseFloat(trade.exitPrice) || entry;
+  const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0) return null;
   
   if (trade.direction === "long") {
-    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
-    if (!isPlausiblePrice(rawMax, entry)) {
-      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
-    }
+    if (!trade.maxPrice) return null;
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return null;
     const maxVal = Math.max(rawMax, entry, exit);
     return ((maxVal - entry) / entry) * 100;
   } else {
-    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
-    if (!isPlausiblePrice(rawMin, entry)) {
-      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
-    }
+    if (!trade.minPrice) return null;
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin) || rawMin === 0) return null;
     const minVal = Math.min(rawMin, entry, exit);
     return ((entry - minVal) / entry) * 100;
   }
@@ -685,21 +727,19 @@ export function calcMfePct(trade) {
 export function calcMaePct(trade) {
   if (!trade.entryPrice || isSkippedTrade(trade)) return null;
   const entry = parseFloat(trade.entryPrice);
-  const exit = parseFloat(trade.exitPrice) || entry;
+  const exit = parseFloat(trade.exitPrice) || 0;
   if (isNaN(entry) || entry === 0) return null;
   
   if (trade.direction === "long") {
-    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
-    if (!isPlausiblePrice(rawMin, entry)) {
-      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
-    }
+    if (!trade.minPrice) return null;
+    const rawMin = parseFloat(trade.minPrice);
+    if (isNaN(rawMin)) return null;
     const minVal = Math.min(rawMin, entry, exit);
     return ((entry - minVal) / entry) * 100;
   } else {
-    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
-    if (!isPlausiblePrice(rawMax, entry)) {
-      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
-    }
+    if (!trade.maxPrice) return null;
+    const rawMax = parseFloat(trade.maxPrice);
+    if (isNaN(rawMax)) return null;
     const maxVal = Math.max(rawMax, entry, exit);
     return ((maxVal - entry) / entry) * 100;
   }
@@ -707,70 +747,104 @@ export function calcMaePct(trade) {
 
 export function calcMfe(trade) {
   if (isSkippedTrade(trade)) return null;
+  if (!trade.entryPrice || !trade.qty) return null;
 
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
   const exit = parseFloat(trade.exitPrice) || entry;
-
-  if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
-    const val = parseFloat(trade.mfe);
-    if (val >= 0 && val < 20000) {
-      return val;
-    }
-  }
-  
   if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
+
   const mult = getEffectiveMultiplier(trade);
-  
-  if (trade.direction === "long") {
-    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
-    if (!isPlausiblePrice(rawMax, entry)) {
-      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
+  const dir = String(trade.direction || "long").toLowerCase();
+  const grossPnl = dir === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult;
+
+  // Base excursion is at least gross profit realized at exit
+  let mfe = Math.max(0, grossPnl);
+
+  // 1. Direct MFE field (e.g. from imported CSV or form input)
+  if (trade.mfe != null && !isNaN(parseFloat(trade.mfe))) {
+    const rawVal = Math.abs(parseFloat(trade.mfe));
+    if (rawVal > 0) {
+      if (entry > 0 && rawVal > entry * 0.1 && rawVal < entry * 3) {
+        // Asset price level (e.g., 29,520.25 for entry 29,316.75)
+        const pts = dir === "long" ? Math.max(0, rawVal - entry) : Math.max(0, entry - rawVal);
+        mfe = Math.max(mfe, pts * qty * mult);
+      } else {
+        // Direct dollar excursion (e.g., $203.50)
+        mfe = Math.max(mfe, rawVal);
+      }
     }
-    const maxVal = Math.max(rawMax, entry, exit);
-    return (maxVal - entry) * qty * mult;
-  } else {
-    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
-    if (!isPlausiblePrice(rawMin, entry)) {
-      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
-    }
-    const minVal = Math.min(rawMin, entry, exit);
-    return (entry - minVal) * qty * mult;
   }
+
+  // 2. maxPrice / minPrice fields
+  const maxP = parseFloat(trade.maxPrice);
+  const minP = parseFloat(trade.minPrice);
+
+  if (!isNaN(maxP) && maxP > 0) {
+    if (entry > 0 && maxP > entry * 0.1 && maxP < entry * 3) {
+      if (dir === "long") mfe = Math.max(mfe, Math.max(0, maxP - entry) * qty * mult);
+      else mfe = Math.max(mfe, Math.max(0, entry - maxP) * qty * mult);
+    } else {
+      mfe = Math.max(mfe, maxP);
+    }
+  }
+
+  if (!isNaN(minP) && minP > 0) {
+    if (entry > 0 && minP > entry * 0.1 && minP < entry * 3) {
+      if (dir === "short") mfe = Math.max(mfe, Math.max(0, entry - minP) * qty * mult);
+    }
+  }
+
+  return mfe;
 }
 
 export function calcMae(trade) {
   if (isSkippedTrade(trade)) return null;
+  if (!trade.entryPrice || !trade.qty) return null;
 
   const entry = parseFloat(trade.entryPrice);
   const qty = parseFloat(trade.qty);
   const exit = parseFloat(trade.exitPrice) || entry;
+  if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
+
+  const mult = getEffectiveMultiplier(trade);
+  const dir = String(trade.direction || "long").toLowerCase();
+  const grossPnl = dir === "long" ? (exit - entry) * qty * mult : (entry - exit) * qty * mult;
+
+  // Base adverse excursion is at least gross loss realized at exit
+  let mae = Math.max(0, -grossPnl);
 
   if (trade.mae != null && !isNaN(parseFloat(trade.mae))) {
-    const val = parseFloat(trade.mae);
-    if (val >= 0 && val < 20000) {
-      return val;
+    const rawVal = Math.abs(parseFloat(trade.mae));
+    if (rawVal > 0) {
+      if (entry > 0 && rawVal > entry * 0.1 && rawVal < entry * 3) {
+        const pts = dir === "long" ? Math.max(0, entry - rawVal) : Math.max(0, rawVal - entry);
+        mae = Math.max(mae, pts * qty * mult);
+      } else {
+        mae = Math.max(mae, rawVal);
+      }
     }
   }
-  
-  if (isNaN(entry) || entry === 0 || isNaN(qty) || qty === 0) return null;
-  const mult = getEffectiveMultiplier(trade);
-  
-  if (trade.direction === "long") {
-    let rawMin = trade.minPrice != null ? parseFloat(trade.minPrice) : null;
-    if (!isPlausiblePrice(rawMin, entry)) {
-      rawMin = Math.min(entry, exit) - (exit < entry ? (entry - exit) * 0.15 : entry * 0.002);
+
+  const maxP = parseFloat(trade.maxPrice);
+  const minP = parseFloat(trade.minPrice);
+
+  if (!isNaN(minP) && minP > 0) {
+    if (entry > 0 && minP > entry * 0.1 && minP < entry * 3) {
+      if (dir === "long") mae = Math.max(mae, Math.max(0, entry - minP) * qty * mult);
+      else mae = Math.max(mae, Math.max(0, minP - entry) * qty * mult);
+    } else {
+      mae = Math.max(mae, minP);
     }
-    const minVal = Math.min(rawMin, entry, exit);
-    return (entry - minVal) * qty * mult;
-  } else {
-    let rawMax = trade.maxPrice != null ? parseFloat(trade.maxPrice) : null;
-    if (!isPlausiblePrice(rawMax, entry)) {
-      rawMax = Math.max(entry, exit) + (exit > entry ? (exit - entry) * 0.15 : entry * 0.002);
-    }
-    const maxVal = Math.max(rawMax, entry, exit);
-    return (maxVal - entry) * qty * mult;
   }
+
+  if (!isNaN(maxP) && maxP > 0) {
+    if (entry > 0 && maxP > entry * 0.1 && maxP < entry * 3) {
+      if (dir === "short") mae = Math.max(mae, Math.max(0, maxP - entry) * qty * mult);
+    }
+  }
+
+  return mae;
 }
 
 export function isRevengeTrade(trade, allTrades) {
@@ -1626,8 +1700,7 @@ export function compressImage(file, maxWidth = 1000, quality = 0.8) {
 
 export function isExecutedTrade(trade) {
   if (!trade) return false;
-  const s = String(trade.status || "executed").toLowerCase().trim();
-  return s === "executed" || s === "closed" || s === "filled" || s === "taken" || s === "win" || s === "loss" || s === "";
+  return !isSkippedTrade(trade);
 }
 
 export function isSkippedTrade(trade) {

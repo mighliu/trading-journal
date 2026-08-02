@@ -11,7 +11,9 @@ import {
   renderRiskTab,
   renderAnalyticsTab,
   renderEdgeInsights,
-  renderPsychologyAnalyticsCard
+  renderPsychologyAnalyticsCard,
+  renderBestWorstDaysCard,
+  renderSetupLeaderboard
 } from './ui.js';
 import { 
   renderCalendar, 
@@ -47,14 +49,18 @@ import {
   renderAdherencePerformanceChart,
   renderDrawdownScatterChart,
   renderMonteCarloChart,
+  renderTrailingDrawdownChart,
+  renderSessionHeatmap,
+  renderSymbolSessionTable,
   destroyAllCharts
 } from './charts.js';
-import { compressImage, hasSevereDeviation } from './utils.js';
+import { compressImage, hasSevereDeviation, calcNetPnl } from './utils.js';
 
 let currentTab = "dashboard";
 const calendarToday = new Date("2026-06-29T17:34:00"); // Base date context
 let calendarYear = calendarToday.getFullYear();
 let calendarMonth = calendarToday.getMonth();
+let darkStreakDismissed = false; // Track if user dismissed the banner this state cycle
 
 async function init() {
   // 1. Initialize SQLite WASM database
@@ -80,6 +86,15 @@ async function init() {
 
   // If no trades exist, show seed notice
   toggleSeedNotice();
+
+  // Setup keyboard shortcuts
+  setupKeyboardShortcuts();
+
+  // Setup note templates
+  setupNoteTemplates();
+
+  // Setup collapsible sections
+  setupCollapsibleSections();
 }
 
 function handleStateChange() {
@@ -133,6 +148,9 @@ function handleStateChange() {
 
   // Render active tab view
   renderActiveView(filteredTrades);
+
+  // Update dark streak banner
+  updateDarkStreakBanner(allTrades);
 
   // Handle seed notice toggle
   toggleSeedNotice();
@@ -200,6 +218,7 @@ function renderActiveView(filteredTrades) {
     renderEdgeInsights();
     renderEquityCurve(filteredTrades, AppState.settings.startingBalance);
     renderDailyPnlChart(filteredTrades);
+    renderBestWorstDaysCard(filteredTrades);
   } else if (currentTab === "tradeLog") {
     renderTradeLog(filteredTrades, 1);
   } else if (currentTab === "calendar") {
@@ -227,6 +246,9 @@ function renderActiveView(filteredTrades) {
     renderFatiguePivotChart(filteredTrades);
     renderTradeSequenceChart(filteredTrades);
     renderPsychologyAnalyticsCard();
+    renderSessionHeatmap(filteredTrades);
+    renderSymbolSessionTable(filteredTrades);
+    renderSetupLeaderboard(filteredTrades);
 
   } else if (currentTab === "intervention") {
     const backupStatus = AppState.activeFilters.status;
@@ -258,6 +280,11 @@ function renderActiveView(filteredTrades) {
     renderTimelineReplayChart(tradesForRisk);
     renderAdherencePerformanceChart(tradesForRisk);
     renderDrawdownScatterChart(tradesForRisk, AppState.settings.startingBalance);
+    // Auto-run trailing drawdown with current sim settings
+    const simAccountSize = parseFloat(document.getElementById("simAccountSize")?.value) || AppState.settings.startingBalance || 50000;
+    const simMaxDDAmt = parseFloat(document.getElementById("simMaxDrawdownAmt")?.value) || 2500;
+    const simStyle = document.getElementById("simDrawdownStyle")?.value || "trailing_capped";
+    renderTrailingDrawdownChart(tradesForRisk, simAccountSize, simMaxDDAmt, simStyle);
   }
 }
 
@@ -300,13 +327,17 @@ function setupActionButtons() {
     });
   }
 
-  // Import button trigger
-  const importBtn = document.getElementById("importBtn");
+  // Import button & Broker Presets trigger
+  let selectedBrokerKey = "auto";
   const importFileInput = document.getElementById("importFileInput");
+  const brokerImportBtns = document.querySelectorAll(".broker-import-btn");
 
-  if (importBtn && importFileInput) {
-    importBtn.addEventListener("click", () => {
-      importFileInput.click();
+  if (importFileInput) {
+    brokerImportBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        selectedBrokerKey = btn.dataset.broker || "auto";
+        importFileInput.click();
+      });
     });
 
     importFileInput.addEventListener("change", (e) => {
@@ -337,12 +368,12 @@ function setupActionButtons() {
           .then(res => handleImportResult(res, "JSON"))
           .catch(err => showToast(err.message, "error"));
       } else if (ext === "csv") {
-        AppState.importCSV(file)
-          .then(res => handleImportResult(res, "CSV"))
+        AppState.importCSV(file, selectedBrokerKey)
+          .then(res => handleImportResult(res, `CSV (${selectedBrokerKey.toUpperCase()})`))
           .catch(err => showToast(err.message, "error"));
       } else if (ext === "xlsx" || ext === "xls") {
-        AppState.importXLSX(file)
-          .then(res => handleImportResult(res, "Excel"))
+        AppState.importXLSX(file, selectedBrokerKey)
+          .then(res => handleImportResult(res, `Excel (${selectedBrokerKey.toUpperCase()})`))
           .catch(err => showToast(err.message, "error"));
       } else {
         showToast("Unsupported file format. Please select a .json, .csv, or .xlsx file.", "error");
@@ -406,12 +437,338 @@ function toggleSeedNotice() {
   }
 }
 
+// ============================================================
+// FEATURE 1: Dark Streak Warning Banner
+// ============================================================
+function updateDarkStreakBanner(allTrades) {
+  const banner = document.getElementById("darkStreakBanner");
+  const titleEl = document.getElementById("darkStreakTitle");
+  const msgEl = document.getElementById("darkStreakMessage");
+  if (!banner || !titleEl || !msgEl) return;
+
+  // Only use executed trades for current account, sorted by exit date
+  const activeAcc = AppState.settings.currentAccount || "Personal";
+  const executed = allTrades
+    .filter(t => t.accountId === activeAcc && t.status !== "skipped")
+    .sort((a, b) => new Date(b.exitDateTime) - new Date(a.exitDateTime));
+
+  if (executed.length === 0) {
+    banner.classList.add("hidden");
+    return;
+  }
+
+  // Count consecutive losses from the most recent trade backwards
+  let streak = 0;
+  let totalLoss = 0;
+  for (const t of executed) {
+    const pnl = calcNetPnl(t);
+    if (pnl < 0) {
+      streak++;
+      totalLoss += pnl;
+    } else {
+      break; // streak broken
+    }
+  }
+
+  // Reset dismissed if streak changed (new trade added or streak broken)
+  const prevStreakKey = `__darkStreakLast`;
+  const prevStreak = window[prevStreakKey] || 0;
+  if (streak !== prevStreak) {
+    darkStreakDismissed = false;
+  }
+  window[prevStreakKey] = streak;
+
+  if (streak < 3 || darkStreakDismissed) {
+    banner.classList.add("hidden");
+    return;
+  }
+
+  banner.classList.remove("hidden", "streak-warning", "streak-danger", "streak-critical");
+
+  if (streak >= 7) {
+    banner.classList.add("streak-critical");
+    titleEl.textContent = `🚨 ${streak}-Trade Losing Streak — Risk Management Alert`;
+    msgEl.textContent = `You've lost ${streak} trades in a row (${Math.abs(totalLoss).toFixed(2)} total). Consider stopping for the day and reviewing your trading plan.`;
+  } else if (streak >= 5) {
+    banner.classList.add("streak-danger");
+    titleEl.textContent = `🔴 ${streak}-Trade Losing Streak — Caution Required`;
+    msgEl.textContent = `${streak} consecutive losses totaling $${Math.abs(totalLoss).toFixed(2)}. Recommended: Step away and review your setup criteria before the next trade.`;
+  } else {
+    banner.classList.add("streak-warning");
+    titleEl.textContent = `⚠️ ${streak}-Trade Losing Streak — Review Your Setup`;
+    msgEl.textContent = `You've had ${streak} consecutive losses ($${Math.abs(totalLoss).toFixed(2)} total). Take a breath and ensure your next trade fully meets your criteria.`;
+  }
+
+  if (typeof lucide !== "undefined") lucide.createIcons();
+}
+
+// ============================================================
+// FEATURE 3: Keyboard-First Trade Entry
+// ============================================================
+function setupKeyboardShortcuts() {
+  const TAB_MAP = {
+    "1": "dashboard",
+    "2": "tradeLog",
+    "3": "calendar",
+    "4": "analytics",
+    "5": "risk",
+    "6": "intervention"
+  };
+
+  document.addEventListener("keydown", (e) => {
+    const active = document.activeElement;
+    const inInput = active && (
+      active.tagName === "INPUT" ||
+      active.tagName === "TEXTAREA" ||
+      active.tagName === "SELECT" ||
+      active.isContentEditable
+    );
+
+    // Escape: close any open modal or day panel
+    if (e.key === "Escape") {
+      const tradeModal = document.getElementById("tradeModal");
+      const settingsModal = document.getElementById("settingsModal");
+      const shortcutsModal = document.getElementById("shortcutsModal");
+      if (tradeModal && tradeModal.classList.contains("open")) { tradeModal.classList.remove("open"); return; }
+      if (settingsModal && settingsModal.classList.contains("open")) { settingsModal.classList.remove("open"); return; }
+      if (shortcutsModal && shortcutsModal.classList.contains("open")) { shortcutsModal.classList.remove("open"); return; }
+      // Close day panel
+      const dayPanel = document.getElementById("dayDetailPanel");
+      if (dayPanel && dayPanel.classList.contains("open")) { dayPanel.classList.remove("open"); return; }
+      return;
+    }
+
+    if (inInput) return; // Don't fire shortcuts while typing
+
+    // ? key: toggle shortcuts modal
+    if (e.key === "?" || e.key === "/") {
+      e.preventDefault();
+      const shortcutsModal = document.getElementById("shortcutsModal");
+      if (shortcutsModal) shortcutsModal.classList.toggle("open");
+      return;
+    }
+
+    // N: open new trade modal
+    if (e.key === "n" || e.key === "N") {
+      e.preventDefault();
+      const addBtn = document.getElementById("addNewTradeBtn");
+      if (addBtn) addBtn.click();
+      return;
+    }
+
+    // Alt+1-6: switch tabs
+    if (e.altKey && TAB_MAP[e.key]) {
+      e.preventDefault();
+      const tabId = TAB_MAP[e.key];
+      const tabBtn = document.querySelector(`.nav-tab-btn[data-tab="${tabId}"]`);
+      if (tabBtn && !tabBtn.classList.contains("hidden") && !tabBtn.disabled) {
+        tabBtn.click();
+      }
+    }
+  });
+}
+
+// ============================================================
+// FEATURE 2: Note Templates for Trade Journal Entries
+// ============================================================
+const NOTE_TEMPLATES = {
+  setup: `📊 SETUP EXECUTED\n─────────────────\nSignal: \nEntry Trigger: \nKey Level / Confirmation: \nRisk Notes: \nExpected Outcome: `,
+  psychology: `🧠 PSYCHOLOGY CHECK\n─────────────────\nPre-Trade Mental State: \nFear / Greed Level (1-10): \nEmotional Bias: \nPost-Trade Reflection: `,
+  mistake: `❌ MISTAKE REVIEW\n─────────────────\nWhat Went Wrong: \nRoot Cause: \nRule Violated: \nCorrection for Next Time: `,
+  winning: `✅ WINNING TRADE\n─────────────────\nWhat Worked: \nSetup Quality (1-10): \nExecution Rating: \nKey Insight to Keep: `,
+  skipped: `⏭️ SKIPPED TRADE\n─────────────────\nSignal Details: \nWhy Skipped: \nOpportunity Cost Estimate: \nWould I Take It Again? `,
+  lesson: `📖 LESSON LEARNED\n─────────────────\nKey Takeaway: \nHow to Apply Next Time: \nRule to Add / Reinforce: `,
+  process: `⚙️ PROCESS REVIEW\n─────────────────\nChecklist Adherence: \nExecution vs Plan: \nAreas to Improve: \nProcess Grade (A-F): `
+};
+
+function setupNoteTemplates() {
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".note-tpl-btn");
+    if (!btn) return;
+
+    const templateKey = btn.dataset.template;
+    const targetField = btn.dataset.target || "notes"; // default to notes
+    const textareaId = targetField === "lessons" ? "tradeLessons" : "tradeNotes";
+    const textarea = document.getElementById(textareaId);
+    if (!textarea || !NOTE_TEMPLATES[templateKey]) return;
+
+    const existing = textarea.value.trim();
+    if (existing) {
+      textarea.value = existing + "\n\n─────────────────\n" + NOTE_TEMPLATES[templateKey];
+    } else {
+      textarea.value = NOTE_TEMPLATES[templateKey];
+    }
+
+    textarea.focus();
+    textarea.scrollTop = textarea.scrollHeight;
+  });
+}
+
+// ============================================================
+// FEATURE 6: PDF Performance Report Export
+// ============================================================
+async function exportPdfReport() {
+  if (typeof window.jspdf === "undefined") {
+    showToast("PDF library not loaded. Please check your internet connection.", "error");
+    return;
+  }
+
+  showToast("Generating PDF report...", "info");
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const trades = AppState.getFilteredTrades();
+  const balance = AppState.settings.startingBalance || 25000;
+  const account = AppState.settings.currentAccount || "Personal";
+
+  // ── Helpers ──
+  const W = 210; // A4 width mm
+  const MARGIN = 18;
+  const contentW = W - MARGIN * 2;
+  let y = 20;
+
+  const fmtCurrency = (v) => {
+    const sign = v >= 0 ? "+" : "";
+    return `${sign}$${Math.abs(v).toFixed(2)}`;
+  };
+
+  // ── Header ──
+  doc.setFillColor(14, 14, 18);
+  doc.rect(0, 0, W, 30, "F");
+  doc.setTextColor(99, 102, 241);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("TradeFlow", MARGIN, 14);
+  doc.setTextColor(200, 200, 210);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Performance Report — ${account} Account`, MARGIN, 21);
+
+  const now = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  doc.text(`Generated: ${now}`, W - MARGIN, 21, { align: "right" });
+
+  y = 40;
+
+  // ── Summary Stats ──
+  let totalPnl = 0, wins = 0, losses = 0, grossWin = 0, grossLoss = 0;
+  for (const t of trades) {
+    const pnl = calcNetPnl(t);
+    totalPnl += pnl;
+    if (pnl > 0) { wins++; grossWin += pnl; }
+    else if (pnl < 0) { losses++; grossLoss += Math.abs(pnl); }
+  }
+  const winRate = trades.length > 0 ? ((wins / trades.length) * 100).toFixed(1) : "0.0";
+  const pf = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : "∞";
+  const endBalance = balance + totalPnl;
+
+  const statBoxes = [
+    { label: "Net Profit", value: fmtCurrency(totalPnl), color: totalPnl >= 0 ? [16, 185, 129] : [239, 68, 68] },
+    { label: "End Balance", value: `$${endBalance.toFixed(2)}`, color: [99, 102, 241] },
+    { label: "Win Rate", value: `${winRate}%`, color: [250, 250, 250] },
+    { label: "Profit Factor", value: pf, color: [250, 250, 250] },
+    { label: "Trades Taken", value: `${trades.length}`, color: [250, 250, 250] },
+    { label: "W / L", value: `${wins} / ${losses}`, color: [250, 250, 250] }
+  ];
+
+  const boxW = contentW / 3;
+  const boxH = 18;
+  for (let i = 0; i < statBoxes.length; i++) {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const bx = MARGIN + col * boxW;
+    const by = y + row * (boxH + 4);
+    doc.setFillColor(24, 24, 27);
+    doc.roundedRect(bx, by, boxW - 3, boxH, 3, 3, "F");
+    doc.setFontSize(7.5);
+    doc.setTextColor(120, 120, 130);
+    doc.setFont("helvetica", "normal");
+    doc.text(statBoxes[i].label.toUpperCase(), bx + 4, by + 6);
+    doc.setFontSize(12);
+    doc.setTextColor(...statBoxes[i].color);
+    doc.setFont("helvetica", "bold");
+    doc.text(statBoxes[i].value, bx + 4, by + 13);
+  }
+
+  y += (Math.ceil(statBoxes.length / 3)) * (boxH + 4) + 10;
+
+  // ── Top 5 Winning & Losing Trades ──
+  const sorted = [...trades].sort((a, b) => calcNetPnl(b) - calcNetPnl(a));
+  const top5 = sorted.slice(0, 5);
+  const bot5 = sorted.slice(-5).reverse();
+
+  const drawTradeTable = (title, tradeList, startY) => {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(180, 180, 200);
+    doc.text(title, MARGIN, startY);
+    startY += 6;
+
+    const cols = ["#", "Symbol", "Date", "P&L", "Direction"];
+    const colW = [8, 28, 40, 30, 28];
+    let cx = MARGIN;
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 100, 110);
+    doc.setFont("helvetica", "normal");
+    for (let c = 0; c < cols.length; c++) {
+      doc.text(cols[c], cx, startY);
+      cx += colW[c];
+    }
+    startY += 2;
+    doc.setDrawColor(50, 50, 60);
+    doc.line(MARGIN, startY, MARGIN + contentW, startY);
+    startY += 4;
+
+    for (let i = 0; i < tradeList.length; i++) {
+      const t = tradeList[i];
+      const pnl = calcNetPnl(t);
+      const color = pnl >= 0 ? [16, 185, 129] : [239, 68, 68];
+      const dateStr = t.exitDateTime ? new Date(t.exitDateTime).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "--";
+      const rowData = [
+        String(i + 1),
+        (t.symbol || "--").toUpperCase(),
+        dateStr,
+        fmtCurrency(pnl),
+        (t.direction || "--").toUpperCase()
+      ];
+      cx = MARGIN;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      for (let c = 0; c < rowData.length; c++) {
+        if (c === 3) {
+          doc.setTextColor(...color);
+          doc.setFont("helvetica", "bold");
+        } else {
+          doc.setTextColor(210, 210, 220);
+          doc.setFont("helvetica", "normal");
+        }
+        doc.text(rowData[c], cx, startY);
+        cx += colW[c];
+      }
+      startY += 6;
+    }
+    return startY + 4;
+  };
+
+  y = drawTradeTable("Top 5 Winning Trades", top5, y);
+  y = drawTradeTable("Top 5 Losing Trades", bot5, y);
+
+  // ── Footer ──
+  doc.setFontSize(7);
+  doc.setTextColor(80, 80, 90);
+  doc.setFont("helvetica", "italic");
+  doc.text("Generated by TradeFlow Journal  •  For informational purposes only. Not financial advice.", W / 2, 285, { align: "center" });
+
+  doc.save(`TradeFlow-Report-${account.replace(/\s+/g, "-")}-${now.replace(/\s+/g, "-")}.pdf`);
+  showToast("PDF report exported successfully!", "success");
+}
+
 window.addEventListener("themeChanged", () => {
   renderActiveView(AppState.getFilteredTrades());
 });
 
 // Kick off when DOM is ready
 document.addEventListener("DOMContentLoaded", init);
+
 
 function setupScreenshotDropzones() {
   const setupDropzone = (zoneId, inputId, previewId, fileInputId) => {
@@ -509,4 +866,94 @@ function setupScreenshotDropzones() {
       showToast("Re-ran 500 Monte Carlo simulation paths!", "info");
     });
   }
+
+  // Trailing Drawdown Sim button
+  const trailingSimBtn = document.getElementById("runTrailingSimBtn");
+  if (trailingSimBtn) {
+    trailingSimBtn.addEventListener("click", () => {
+      const backupStatus = AppState.activeFilters.status;
+      AppState.activeFilters.status = "all";
+      const tradesForRisk = AppState.getFilteredTrades();
+      AppState.activeFilters.status = backupStatus;
+      const simAccountSize = parseFloat(document.getElementById("simAccountSize")?.value) || 50000;
+      const simMaxDDAmt = parseFloat(document.getElementById("simMaxDrawdownAmt")?.value) || 2500;
+      const simStyle = document.getElementById("simDrawdownStyle")?.value || "trailing_capped";
+      renderTrailingDrawdownChart(tradesForRisk, simAccountSize, simMaxDDAmt, simStyle);
+      showToast("Prop firm trailing drawdown simulation updated!", "info");
+    });
+  }
+
+  // PDF Export button
+  const exportPdfBtn = document.getElementById("exportPdfBtn");
+  if (exportPdfBtn) {
+    exportPdfBtn.addEventListener("click", () => {
+      exportPdfReport();
+    });
+  }
+
+  // Dark streak banner dismiss
+  const darkStreakDismissBtn = document.getElementById("darkStreakDismissBtn");
+  if (darkStreakDismissBtn) {
+    darkStreakDismissBtn.addEventListener("click", () => {
+      darkStreakDismissed = true;
+      const banner = document.getElementById("darkStreakBanner");
+      if (banner) banner.classList.add("hidden");
+    });
+  }
+
+  // Keyboard shortcuts modal
+  const shortcutsBtn = document.getElementById("keyboardShortcutsBtn");
+  const closeShortcutsBtn = document.getElementById("closeShortcutsBtn");
+  const closeShortcutsOkBtn = document.getElementById("closeShortcutsOkBtn");
+  const shortcutsModal = document.getElementById("shortcutsModal");
+  const openShortcuts = () => { if (shortcutsModal) shortcutsModal.classList.add("open"); };
+  const closeShortcuts = () => { if (shortcutsModal) shortcutsModal.classList.remove("open"); };
+  if (shortcutsBtn) shortcutsBtn.addEventListener("click", openShortcuts);
+  if (closeShortcutsBtn) closeShortcutsBtn.addEventListener("click", closeShortcuts);
+  if (closeShortcutsOkBtn) closeShortcutsOkBtn.addEventListener("click", closeShortcuts);
+  if (shortcutsModal) {
+    shortcutsModal.addEventListener("click", (e) => {
+      if (e.target === shortcutsModal) closeShortcuts();
+    });
+  }
 }
+
+// ============================================================
+// FEATURE: Collapsible Section Headers
+// ============================================================
+function setupCollapsibleSections() {
+  document.addEventListener("click", (e) => {
+    const header = e.target.closest(".collapsible-group-header");
+    if (!header) return;
+
+    const targetId = header.dataset.target;
+    if (!targetId) return;
+
+    const targetEl = document.getElementById(targetId);
+    if (!targetEl) return;
+
+    header.classList.toggle("collapsed");
+    targetEl.classList.toggle("hidden");
+
+    // Save preference
+    try {
+      const collapsedStates = JSON.parse(localStorage.getItem("tradeflow_collapsed_sections") || "{}");
+      collapsedStates[targetId] = targetEl.classList.contains("hidden");
+      localStorage.setItem("tradeflow_collapsed_sections", JSON.stringify(collapsedStates));
+    } catch (err) {}
+  });
+
+  // Restore saved states on initial load
+  try {
+    const collapsedStates = JSON.parse(localStorage.getItem("tradeflow_collapsed_sections") || "{}");
+    Object.entries(collapsedStates).forEach(([targetId, isCollapsed]) => {
+      if (isCollapsed) {
+        const header = document.querySelector(`.collapsible-group-header[data-target="${targetId}"]`);
+        const targetEl = document.getElementById(targetId);
+        if (header) header.classList.add("collapsed");
+        if (targetEl) targetEl.classList.add("hidden");
+      }
+    });
+  } catch (err) {}
+}
+

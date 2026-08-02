@@ -961,29 +961,30 @@ export function updateLiveCalc() {
   liveDurationEl.textContent = formatDuration(duration);
 
   // Signal live updates
-  const signalEntry = parseFloat(document.getElementById("tradeSignalEntryPrice").value);
-  const signalExit = parseFloat(document.getElementById("tradeSignalExitPrice").value);
+  const hasIntervention = document.getElementById("tradeHasIntervention")?.checked;
+  const interventionType = hasIntervention ? (document.getElementById("tradeIntervention")?.value || "followed") : "followed";
 
-  if (!isNaN(signalEntry) || !isNaN(signalExit)) {
-    const mockTradeWithSignal = {
-      ...mockTrade,
-      signalEntryPrice: isNaN(signalEntry) ? null : signalEntry,
-      signalExitPrice: isNaN(signalExit) ? null : signalExit
-    };
+  const signalEntryInput = document.getElementById("tradeSignalEntryPrice")?.value;
+  const signalExitInput = document.getElementById("tradeSignalExitPrice")?.value;
 
-    const sPnl = calcSignalPnl(mockTradeWithSignal);
-    const diff = calcPnlDiff(sPnl, net);
+  const mockTradeWithSignal = {
+    ...mockTrade,
+    interventionType,
+    signalEntryPrice: signalEntryInput ? parseFloat(signalEntryInput) : null,
+    signalExitPrice: signalExitInput ? parseFloat(signalExitInput) : null
+  };
 
-    if (liveSignalPnlEl) {
-      liveSignalPnlEl.textContent = formatCurrency(sPnl);
-      liveSignalPnlEl.className = `live-math-val ${sPnl > 0 ? "profit" : sPnl < 0 ? "loss" : ""}`;
-    }
+  const sPnl = calcSignalPnl(mockTradeWithSignal);
+  const diff = net - sPnl;
 
-    if (liveSignalDiffEl) {
-      liveSignalDiffEl.textContent = formatCurrency(diff);
-      // diff > 0 means Actual P&L is greater than Signal P&L (saved money / beat the signal)
-      liveSignalDiffEl.className = `live-math-val ${diff > 0 ? "profit" : diff < 0 ? "loss" : ""}`;
-    }
+  if (liveSignalPnlEl) {
+    liveSignalPnlEl.textContent = formatCurrency(sPnl);
+    liveSignalPnlEl.className = `live-math-val ${sPnl > 0 ? "profit" : sPnl < 0 ? "loss" : ""}`;
+  }
+
+  if (liveSignalDiffEl) {
+    liveSignalDiffEl.textContent = formatCurrency(diff);
+    liveSignalDiffEl.className = `live-math-val ${diff > 0 ? "profit" : diff < 0 ? "loss" : ""}`;
   } else {
     if (liveSignalPnlEl) {
       liveSignalPnlEl.textContent = "-";
@@ -1292,23 +1293,25 @@ export function setupUIListeners() {
           }
         }
 
-        if (maxPriceVal !== null && !isNaN(maxPriceVal)) {
-          const maxVal = Math.max(maxPriceVal, entryPriceVal, exitPriceVal);
-          const diff = maxVal - entryPriceVal;
-          if (currentDirection === "long") {
-            mfe = diff * qtyVal * mult;
+        if (maxPriceVal !== null && !isNaN(maxPriceVal) && maxPriceVal > 0) {
+          if (entryPriceVal > 0 && maxPriceVal > entryPriceVal * 0.1 && maxPriceVal < entryPriceVal * 3) {
+            const maxVal = Math.max(maxPriceVal, entryPriceVal, exitPriceVal);
+            const diff = maxVal - entryPriceVal;
+            if (currentDirection === "long") mfe = diff * qtyVal * mult;
+            else mae = diff * qtyVal * mult;
           } else {
-            mae = diff * qtyVal * mult;
+            mfe = maxPriceVal;
           }
         }
 
-        if (minPriceVal !== null && !isNaN(minPriceVal)) {
-          const minVal = Math.min(minPriceVal, entryPriceVal, exitPriceVal);
-          const diff = entryPriceVal - minVal;
-          if (currentDirection === "long") {
-            mae = diff * qtyVal * mult;
+        if (minPriceVal !== null && !isNaN(minPriceVal) && minPriceVal > 0) {
+          if (entryPriceVal > 0 && minPriceVal > entryPriceVal * 0.1 && minPriceVal < entryPriceVal * 3) {
+            const minVal = Math.min(minPriceVal, entryPriceVal, exitPriceVal);
+            const diff = entryPriceVal - minVal;
+            if (currentDirection === "long") mae = diff * qtyVal * mult;
+            else mfe = diff * qtyVal * mult;
           } else {
-            mfe = diff * qtyVal * mult;
+            mae = minPriceVal;
           }
         }
       }
@@ -1729,7 +1732,11 @@ export function populateAccountSelector() {
 }
 
 export function renderInterventionMatrix(trades) {
-  const analytics = calcInterventionAnalytics(trades, AppState.settings.startingBalance);
+  const currentAccount = AppState.settings.currentAccount || "Personal";
+  const startingBalance = typeof AppState.getStartingBalance === "function" 
+    ? AppState.getStartingBalance(currentAccount) 
+    : (AppState.settings.startingBalance || 25000);
+  const analytics = calcInterventionAnalytics(trades, startingBalance);
 
   // Update IER Gauge UI
   const ierValue = document.getElementById("ierGaugeValue");
@@ -1818,9 +1825,9 @@ export function renderInterventionMatrix(trades) {
     },
     {
       label: "Max Drawdown",
-      actVal: `${formatPnl(actual.maxDrawdown.amount)} (${actual.maxDrawdown.percent.toFixed(1)}%)`,
-      stratVal: `${formatPnl(strategy.maxDrawdown.amount)} (${strategy.maxDrawdown.percent.toFixed(1)}%)`,
-      deltaVal: `${actual.maxDrawdown.amount <= strategy.maxDrawdown.amount ? "+" : ""}${formatPnl(strategy.maxDrawdown.amount - actual.maxDrawdown.amount)}`,
+      actVal: `$${actual.maxDrawdown.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${actual.maxDrawdown.percent.toFixed(1)}%)`,
+      stratVal: `$${strategy.maxDrawdown.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${strategy.maxDrawdown.percent.toFixed(1)}%)`,
+      deltaVal: `${(strategy.maxDrawdown.amount - actual.maxDrawdown.amount) >= 0 ? "+" : "-"}$${Math.abs(strategy.maxDrawdown.amount - actual.maxDrawdown.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       className: getDeltaClass(actual.maxDrawdown.amount, strategy.maxDrawdown.amount, false) // lower is better!
     },
     {
@@ -2304,3 +2311,154 @@ export function renderPsychologyAnalyticsCard() {
     </div>
   `;
 }
+
+export function renderBestWorstDaysCard(trades) {
+  const container = document.getElementById("bestWorstDaysContainer");
+  if (!container) return;
+
+  const executed = trades.filter(t => isExecutedTrade(t));
+  if (executed.length === 0) {
+    container.innerHTML = `<span class="muted" style="font-size: 0.8125rem;">No executed trades logged yet.</span>`;
+    return;
+  }
+
+  // Group by date (YYYY-MM-DD)
+  const daysMap = {};
+  for (const t of executed) {
+    const dtStr = t.exitDateTime ? t.exitDateTime.split("T")[0] : null;
+    if (!dtStr) continue;
+    const pnl = calcNetPnl(t);
+    if (!daysMap[dtStr]) {
+      daysMap[dtStr] = { date: dtStr, pnl: 0, count: 0, wins: 0 };
+    }
+    daysMap[dtStr].pnl += pnl;
+    daysMap[dtStr].count++;
+    if (pnl > 0) daysMap[dtStr].wins++;
+  }
+
+  const sortedDays = Object.values(daysMap).sort((a, b) => b.pnl - a.pnl);
+  const bestDays = sortedDays.slice(0, 3);
+  const worstDays = sortedDays.slice(-3).reverse();
+
+  const renderDayList = (list, isBest) => {
+    if (list.length === 0) return `<span class="muted" style="font-size: 0.75rem;">No session data available</span>`;
+    return list.map((d, i) => {
+      const dateFormatted = new Date(d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const winRate = d.count > 0 ? Math.round((d.wins / d.count) * 100) : 0;
+      const sign = d.pnl >= 0 ? "+" : "";
+      const color = d.pnl >= 0 ? "var(--profit)" : "var(--loss)";
+      const badgeClass = isBest ? "best-day-badge" : "worst-day-badge";
+      const icon = isBest ? "🏆" : "⚠️";
+      return `
+        <div class="day-rank-card">
+          <div style="display: flex; align-items: center;">
+            <span class="day-rank-badge ${badgeClass}">${icon} #${i + 1}</span>
+            <div>
+              <strong style="font-size: 0.875rem; display: block; color: var(--text-primary);">${dateFormatted}</strong>
+              <span class="muted" style="font-size: 0.75rem;">${d.count} trade${d.count !== 1 ? 's' : ''} • ${winRate}% win rate</span>
+            </div>
+          </div>
+          <strong style="font-size: 0.9375rem; color: ${color};">${sign}$${d.pnl.toFixed(2)}</strong>
+        </div>
+      `;
+    }).join("");
+  };
+
+  container.innerHTML = `
+    <div>
+      <h4 style="margin: 0 0 10px; font-size: 0.8125rem; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em;">Top 3 Best Trading Sessions</h4>
+      ${renderDayList(bestDays, true)}
+    </div>
+    <div>
+      <h4 style="margin: 0 0 10px; font-size: 0.8125rem; font-weight: 700; color: #f87171; text-transform: uppercase; letter-spacing: 0.05em;">Top 3 Worst Trading Sessions</h4>
+      ${renderDayList(worstDays, false)}
+    </div>
+  `;
+
+  if (typeof lucide !== "undefined") lucide.createIcons();
+}
+
+export function renderSetupLeaderboard(trades) {
+  const container = document.getElementById("setupLeaderboardContainer");
+  if (!container) return;
+
+  const executed = trades.filter(t => isExecutedTrade(t));
+  if (executed.length === 0) {
+    container.innerHTML = `<span class="muted" style="font-size: 0.8125rem;">No executed trades logged yet.</span>`;
+    return;
+  }
+
+  // Aggregate stats per setup tag
+  const tagMap = {};
+  for (const t of executed) {
+    const rawSetups = (t.setup || "").split(",").map(s => s.trim()).filter(Boolean);
+    const tags = rawSetups.length > 0 ? rawSetups : ["Unspecified"];
+    const pnl = calcNetPnl(t);
+
+    for (const tag of tags) {
+      if (!tagMap[tag]) {
+        tagMap[tag] = { name: tag, pnl: 0, count: 0, wins: 0, grossWins: 0, grossLosses: 0 };
+      }
+      tagMap[tag].pnl += pnl;
+      tagMap[tag].count++;
+      if (pnl > 0) {
+        tagMap[tag].wins++;
+        tagMap[tag].grossWins += pnl;
+      } else if (pnl < 0) {
+        tagMap[tag].grossLosses += Math.abs(pnl);
+      }
+    }
+  }
+
+  const sortedTags = Object.values(tagMap).sort((a, b) => b.pnl - a.pnl);
+
+  let html = `
+    <table class="setup-leaderboard-table">
+      <thead>
+        <tr>
+          <th style="width: 50px;">Rank</th>
+          <th>Setup Tag</th>
+          <th>Trades</th>
+          <th>Win Rate</th>
+          <th>Expectancy</th>
+          <th>Profit Factor</th>
+          <th style="text-align: right;">Total Net P&amp;L</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  sortedTags.forEach((st, idx) => {
+    const wr = Math.round((st.wins / st.count) * 100);
+    const expectancy = st.count > 0 ? st.pnl / st.count : 0;
+    const pf = st.grossLosses > 0 ? (st.grossWins / st.grossLosses).toFixed(2) : (st.grossWins > 0 ? "∞" : "0.00");
+    const pnlSign = st.pnl >= 0 ? "+" : "";
+    const expSign = expectancy >= 0 ? "+" : "";
+    const pnlColor = st.pnl >= 0 ? "var(--profit)" : "var(--loss)";
+    const expColor = expectancy >= 0 ? "var(--profit)" : "var(--loss)";
+    const medal = idx === 0 ? "🥇 " : idx === 1 ? "🥈 " : idx === 2 ? "🥉 " : `#${idx + 1}`;
+
+    html += `
+      <tr>
+        <td style="font-weight: 700; color: var(--text-secondary);">${medal}</td>
+        <td><span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); padding: 3px 10px; border-radius: 6px; font-weight: 600;">${st.name}</span></td>
+        <td>${st.count}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="flex: 1; max-width: 60px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+              <div style="width: ${wr}%; height: 100%; background: ${wr >= 50 ? 'var(--profit)' : 'var(--loss)'};"></div>
+            </div>
+            <span>${wr}%</span>
+          </div>
+        </td>
+        <td style="color: ${expColor}; font-weight: 600;">${expSign}$${expectancy.toFixed(2)}</td>
+        <td style="font-weight: 600;">${pf}</td>
+        <td style="text-align: right; font-weight: 700; color: ${pnlColor};">${pnlSign}$${st.pnl.toFixed(2)}</td>
+      </tr>
+    `;
+  });
+
+  html += `</tbody></table>`;
+  container.innerHTML = html;
+}
+

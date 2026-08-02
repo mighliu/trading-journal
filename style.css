@@ -171,7 +171,6 @@ h1, h2, h3, h4, h5, h6 {
   gap: 12px;
 }
 
-/* Input elements styling */
 input, select, textarea {
   background-color: var(--bg-input);
   border: 1px solid var(--border);
@@ -182,6 +181,17 @@ input, select, textarea {
   font-size: 0.875rem;
   outline: none;
   transition: all 0.2s ease;
+}
+
+select option {
+  background-color: #18181b;
+  color: #fafafa;
+  padding: 8px 12px;
+}
+
+body.light-theme select option {
+  background-color: #ffffff;
+  color: #18181b;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -2114,3 +2124,302 @@ body.light-theme .live-math-bottom {
 .badge-grade-d { color: #f97316; border-color: rgba(249, 115, 22, 0.4); }
 .badge-grade-f { color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
 .badge-grade-unspecified { color: var(--text-secondary); border-color: var(--border); }
+
+/* ==========================================================================
+   FEATURE: Dark Streak Warning Banner
+   ========================================================================== */
+.dark-streak-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid;
+  font-size: 0.875rem;
+  animation: streakSlideIn 0.3s ease;
+}
+.dark-streak-banner.streak-warning {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.3);
+  color: #fbbf24;
+}
+.dark-streak-banner.streak-danger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #f87171;
+}
+.dark-streak-banner.streak-critical {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+  animation: streakPulse 2s ease-in-out infinite;
+}
+.dark-streak-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+@keyframes streakSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes streakPulse {
+  0%, 100% { background: rgba(239, 68, 68, 0.18); }
+  50%       { background: rgba(239, 68, 68, 0.28); }
+}
+
+/* ==========================================================================
+   5 NEW FEATURES STYLES
+   ============================================================ */
+
+/* Collapsible Section Headers */
+.collapsible-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 8px;
+  margin: 20px 0 12px 0;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.collapsible-group-header:hover {
+  background: var(--bg-card-hover);
+}
+.collapsible-group-header .chevron-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+.collapsible-group-header.collapsed .chevron-icon {
+  transform: rotate(-90deg);
+}
+
+/* Best & Worst Days Card */
+.best-worst-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .best-worst-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.day-rank-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: background 0.15s ease;
+}
+.day-rank-card:hover {
+  background: var(--bg-card-hover);
+}
+.day-rank-badge {
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  margin-right: 8px;
+}
+.best-day-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.worst-day-badge {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Setup Leaderboard Table */
+.setup-leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+.setup-leaderboard-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.setup-leaderboard-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.setup-leaderboard-table tr:last-child td {
+  border-bottom: none;
+}
+.setup-leaderboard-table tr:hover td {
+  background: var(--bg-card-hover);
+}
+
+/* Symbol x Session Heatmap Table */
+.symbol-session-table-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.symbol-session-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78125rem;
+  text-align: center;
+}
+.symbol-session-table th {
+  padding: 8px 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+.symbol-session-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  font-weight: 600;
+  transition: opacity 0.15s ease;
+}
+.symbol-session-table td.symbol-col {
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+/* ==========================================================================
+   FEATURE: Note Templates Pills
+   ========================================================================== */
+.note-template-pills {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.note-template-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 2px;
+}
+.note-tpl-btn {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.note-tpl-btn:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+.note-tpl-btn:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   FEATURE: Session Heatmap Table
+   ========================================================================== */
+.session-heatmap-table {
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: 0.72rem;
+  min-width: 540px;
+  width: 100%;
+}
+.session-heatmap-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: center;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.session-heatmap-table td {
+  border-radius: 5px;
+  width: 64px;
+  height: 44px;
+  text-align: center;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+  font-weight: 600;
+}
+.session-heatmap-table td:hover {
+  transform: scale(1.08);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 2;
+}
+.session-heatmap-table .hour-label {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 500;
+  text-align: right;
+  padding-right: 8px;
+  white-space: nowrap;
+  background: none !important;
+  cursor: default;
+}
+.session-heatmap-table .hour-label:hover {
+  transform: none;
+  box-shadow: none;
+}
+.heatmap-cell-val {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.heatmap-cell-count {
+  display: block;
+  font-size: 0.6rem;
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+/* ==========================================================================
+   FEATURE: Keyboard Shortcut kbd tags
+   ========================================================================== */
+kbd {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  display: inline-block;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+body.light-theme kbd {
+  background: rgba(0,0,0,0.06);
+  border-color: rgba(0,0,0,0.15);
+  color: var(--text-primary);
+}
+
