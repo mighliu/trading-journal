@@ -1300,7 +1300,9 @@ export function setupUIListeners() {
             if (currentDirection === "long") mfe = diff * qtyVal * mult;
             else mae = diff * qtyVal * mult;
           } else {
-            mfe = maxPriceVal;
+            // For short trades: max price = adverse excursion (MAE), for long = favorable (MFE)
+            if (currentDirection === "short") { mae = maxPriceVal; }
+            else { mfe = maxPriceVal; }
           }
         }
 
@@ -1311,7 +1313,9 @@ export function setupUIListeners() {
             if (currentDirection === "long") mae = diff * qtyVal * mult;
             else mfe = diff * qtyVal * mult;
           } else {
-            mae = minPriceVal;
+            // For short trades: min price = favorable excursion (MFE), for long = adverse (MAE)
+            if (currentDirection === "short") { mfe = minPriceVal; }
+            else { mae = minPriceVal; }
           }
         }
       }

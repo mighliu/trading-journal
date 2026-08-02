@@ -408,8 +408,10 @@ export function normalizeDateTime(dateVal) {
   if (dateVal instanceof Date) {
     d = dateVal;
   } else if (typeof dateVal === "number") {
-    if (dateVal > 10000000000) {
-      d = new Date(dateVal < 1000000000000 ? dateVal * 1000 : dateVal);
+    // Excel serials are ~40,000–60,000. Unix timestamps in seconds are ~1.7B.
+    // Threshold at 100,000 to correctly separate the two.
+    if (dateVal > 100000) {
+      d = new Date(dateVal < 10000000000 ? dateVal * 1000 : dateVal);
     } else {
       d = excelSerialToDate(dateVal);
     }
@@ -417,8 +419,8 @@ export function normalizeDateTime(dateVal) {
     const str = String(dateVal).trim();
     const num = Number(str);
     if (str && !isNaN(num) && num > 1000) {
-      if (num > 10000000000) {
-        d = new Date(num < 1000000000000 ? num * 1000 : num);
+      if (num > 100000) {
+        d = new Date(num < 10000000000 ? num * 1000 : num);
       } else {
         d = excelSerialToDate(num);
       }
