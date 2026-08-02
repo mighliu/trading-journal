@@ -1553,29 +1553,6 @@ export function setupUIListeners() {
   }
 
   // Global Keyboard shortcuts handler
-  document.addEventListener("keydown", (e) => {
-    // If inside input, textarea or select, ignore keyboard shortcuts
-    const active = document.activeElement;
-    if (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT") {
-      if (e.key === "Escape") {
-        closeTradeModal();
-        closeSettingsModal();
-      }
-      return;
-    }
-
-    if (e.key.toLowerCase() === "n") {
-      e.preventDefault();
-      openTradeModal();
-    }
-    
-    if (e.key === "Escape") {
-      closeTradeModal();
-      closeSettingsModal();
-      closeDayPanel();
-    }
-  });
-
   // Delegated Trade Log actions (expand, edit, delete)
   const tbody = document.getElementById("tradeLogTbody");
   if (tbody) {
