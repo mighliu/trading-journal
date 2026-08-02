@@ -118,15 +118,7 @@ export function calcSignalPnl(trade) {
     return 0;
   }
 
-  // 4. Explicit signal prices provided
-  if (trade.signalEntryPrice != null && trade.signalExitPrice != null &&
-      !isNaN(parseFloat(trade.signalEntryPrice)) && !isNaN(parseFloat(trade.signalExitPrice))) {
-    const sigEntry = parseFloat(trade.signalEntryPrice);
-    const sigExit = parseFloat(trade.signalExitPrice);
-    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-  }
-
-  // 5. Early Profit Cut (Profit Protect)
+  // 4. Early Profit Cut (Profit Protect)
   if (type === "early_profit") {
     const mfeRaw = parseFloat(trade.mfe != null ? trade.mfe : trade.maxPrice);
     if (!isNaN(mfeRaw) && mfeRaw > 0) {
@@ -134,13 +126,13 @@ export function calcSignalPnl(trade) {
         const pts = direction === "long" ? Math.max(0, mfeRaw - entry) : Math.max(0, entry - mfeRaw);
         return pts * qty * mult - fees;
       } else {
-        return mfeRaw;
+        return mfeRaw * mult - fees;
       }
     }
     return actPnl > 0 ? actPnl * 1.25 : Math.abs(actPnl) * 1.25;
   }
 
-  // 6. Early Loss Cut (Loss Stop)
+  // 5. Early Loss Cut (Loss Stop)
   if (type === "early_loss") {
     const stopRaw = parseFloat(trade.stopLoss);
     if (!isNaN(stopRaw) && stopRaw > 0) {
@@ -148,7 +140,7 @@ export function calcSignalPnl(trade) {
         const pts = direction === "long" ? Math.max(0, entry - stopRaw) : Math.max(0, stopRaw - entry);
         return -(pts * qty * mult + fees);
       } else {
-        return -stopRaw;
+        return -(stopRaw * mult + fees);
       }
     }
     const maeRaw = parseFloat(trade.mae != null ? trade.mae : trade.minPrice);
@@ -157,18 +149,31 @@ export function calcSignalPnl(trade) {
         const pts = direction === "long" ? Math.max(0, entry - maeRaw) : Math.max(0, maeRaw - entry);
         return -(pts * qty * mult + fees);
       } else {
-        return -maeRaw;
+        return -(maeRaw * mult + fees);
       }
     }
-    return actPnl < 0 ? actPnl * 1.25 : -Math.abs(actPnl) * 1.25;
+    return actPnl < 0 ? actPnl * 1.25 : -Math.abs(actPnl || 100);
   }
 
-  // 7. Late Entry Chase
+  // 6. Late Entry Chase
   if (type === "late_entry") {
-    let sigEntry = entry;
-    if (direction === "long") sigEntry = entry * 0.995;
-    else sigEntry = entry * 1.005;
-    return (exit - sigEntry) * qty * mult * dirMult - fees;
+    let sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
+    if (trade.signalEntryPrice != null && !isNaN(parseFloat(trade.signalEntryPrice)) && parseFloat(trade.signalEntryPrice) !== entry) {
+      sigEntry = parseFloat(trade.signalEntryPrice);
+    }
+    let sigExit = exit;
+    if (trade.signalExitPrice != null && !isNaN(parseFloat(trade.signalExitPrice)) && parseFloat(trade.signalExitPrice) !== exit) {
+      sigExit = parseFloat(trade.signalExitPrice);
+    }
+    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+  }
+
+  // 7. Explicit signal prices provided as fallback
+  if (trade.signalEntryPrice != null && trade.signalExitPrice != null &&
+      !isNaN(parseFloat(trade.signalEntryPrice)) && !isNaN(parseFloat(trade.signalExitPrice))) {
+    const sigEntry = parseFloat(trade.signalEntryPrice);
+    const sigExit = parseFloat(trade.signalExitPrice);
+    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
   }
 
   return actPnl;
