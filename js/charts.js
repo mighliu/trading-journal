@@ -1167,7 +1167,7 @@ export function renderSlippageSymbolChart(trades) {
   const symbolSlippage = {};
   for (const trade of trades) {
     if (isSkippedTrade(trade)) continue;
-    if (trade.signalEntryPrice != null || trade.signalExitPrice != null) {
+    if (hasSevereDeviation(trade) || trade.signalEntryPrice != null || trade.signalExitPrice != null) {
       const actPnl = calcNetPnl(trade);
       const sigPnl = calcSignalPnl(trade);
       const slippage = actPnl - sigPnl; // positive is good
@@ -1355,9 +1355,9 @@ export function renderCumulativeSlippageChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  // Filter trades that have at least one signal parameter defined
+  // Filter trades that have at least one signal parameter defined or are interventions
   const sigTrades = trades
-    .filter(t => !isSkippedTrade(t) && (t.signalEntryPrice != null || t.signalExitPrice != null))
+    .filter(t => !isSkippedTrade(t) && (hasSevereDeviation(t) || t.signalEntryPrice != null || t.signalExitPrice != null))
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sigTrades.length === 0) {
@@ -2345,6 +2345,10 @@ export function renderMfeMaeCharts(trades) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: "nearest",
+            intersect: true
+          },
           plugins: {
             legend: { display: false },
             tooltip: {
@@ -2437,6 +2441,10 @@ export function renderMfeMaeCharts(trades) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: "nearest",
+            intersect: true
+          },
           plugins: {
             legend: { display: false },
             tooltip: {

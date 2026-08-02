@@ -1300,8 +1300,7 @@ export function setupUIListeners() {
             if (currentDirection === "long") mfe = diff * qtyVal * mult;
             else mae = diff * qtyVal * mult;
           } else {
-            if (currentDirection === "long") mfe = maxPriceVal;
-            else mae = maxPriceVal;
+            mfe = maxPriceVal;
           }
         }
 
@@ -1312,8 +1311,7 @@ export function setupUIListeners() {
             if (currentDirection === "long") mae = diff * qtyVal * mult;
             else mfe = diff * qtyVal * mult;
           } else {
-            if (currentDirection === "long") mae = minPriceVal;
-            else mfe = minPriceVal;
+            mae = minPriceVal;
           }
         }
       }
@@ -1827,9 +1825,9 @@ export function renderInterventionMatrix(trades) {
     },
     {
       label: "Max Drawdown",
-      actVal: `${formatPnl(actual.maxDrawdown.amount)} (${actual.maxDrawdown.percent.toFixed(1)}%)`,
-      stratVal: `${formatPnl(strategy.maxDrawdown.amount)} (${strategy.maxDrawdown.percent.toFixed(1)}%)`,
-      deltaVal: `${actual.maxDrawdown.amount <= strategy.maxDrawdown.amount ? "+" : ""}${formatPnl(strategy.maxDrawdown.amount - actual.maxDrawdown.amount)}`,
+      actVal: `$${actual.maxDrawdown.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${actual.maxDrawdown.percent.toFixed(1)}%)`,
+      stratVal: `$${strategy.maxDrawdown.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${strategy.maxDrawdown.percent.toFixed(1)}%)`,
+      deltaVal: `${(strategy.maxDrawdown.amount - actual.maxDrawdown.amount) >= 0 ? "+" : "-"}$${Math.abs(strategy.maxDrawdown.amount - actual.maxDrawdown.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       className: getDeltaClass(actual.maxDrawdown.amount, strategy.maxDrawdown.amount, false) // lower is better!
     },
     {

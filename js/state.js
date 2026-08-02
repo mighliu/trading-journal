@@ -1530,7 +1530,9 @@ class StateManager {
           manualPnl: manualPnl,
           interventionType: "followed",
           maxPrice: runUpCol !== -1 && row[runUpCol] !== "" ? parseFloat(row[runUpCol]) : null,
-          minPrice: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null
+          minPrice: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null,
+          mfe: runUpCol !== -1 && row[runUpCol] !== "" ? parseFloat(row[runUpCol]) : null,
+          mae: drawdownCol !== -1 && row[drawdownCol] !== "" ? parseFloat(row[drawdownCol]) : null
         });
       }
     }

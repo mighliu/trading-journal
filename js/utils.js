@@ -97,11 +97,6 @@ export function calcSignalPnl(trade) {
     return actPnl;
   }
 
-  // 2. Discretionary trade taken with NO strategy signal
-  if (type === "manual_no_signal") {
-    return 0; // Mechanical strategy rule generated $0 P&L (did not take trade)
-  }
-
   const qty = parseFloat(trade.qty) || 0;
   const entry = parseFloat(trade.entryPrice) || 0;
   const exit = parseFloat(trade.exitPrice) || entry;
@@ -109,6 +104,11 @@ export function calcSignalPnl(trade) {
   const dirMult = direction === "short" ? -1 : 1;
   const fees = parseFloat(trade.fees) || 0;
   const mult = getEffectiveMultiplier(trade);
+
+  // 2. Discretionary trade taken with NO strategy signal
+  if (type === "manual_no_signal") {
+    return 0; // Mechanical strategy rule generated $0 P&L (did not take trade)
+  }
 
   // 3. Skipped Trades (Strategy executed trade, trader skipped it)
   if (isSkippedTrade(trade)) {
@@ -126,7 +126,7 @@ export function calcSignalPnl(trade) {
         const pts = direction === "long" ? Math.max(0, mfeRaw - entry) : Math.max(0, entry - mfeRaw);
         return pts * qty * mult - fees;
       } else {
-        return mfeRaw * mult - fees;
+        return mfeRaw - fees;
       }
     }
     return actPnl > 0 ? actPnl * 1.25 : Math.abs(actPnl) * 1.25;
@@ -140,7 +140,7 @@ export function calcSignalPnl(trade) {
         const pts = direction === "long" ? Math.max(0, entry - stopRaw) : Math.max(0, stopRaw - entry);
         return -(pts * qty * mult + fees);
       } else {
-        return -(stopRaw * mult + fees);
+        return -(stopRaw + fees);
       }
     }
     const maeRaw = parseFloat(trade.mae != null ? trade.mae : trade.minPrice);
@@ -149,7 +149,7 @@ export function calcSignalPnl(trade) {
         const pts = direction === "long" ? Math.max(0, entry - maeRaw) : Math.max(0, maeRaw - entry);
         return -(pts * qty * mult + fees);
       } else {
-        return -(maeRaw * mult + fees);
+        return -(maeRaw + fees);
       }
     }
     return actPnl < 0 ? actPnl * 1.25 : -Math.abs(actPnl || 100);
@@ -620,14 +620,12 @@ export function calcInterventionAnalytics(trades, startingBalance = 25000) {
   const strategyTrades = trades.map(t => {
     const stratPnl = calcSignalPnl(t);
     return {
+      ...t,
       status: "executed",
-      direction: "long",
-      entryPrice: stratPnl >= 0 ? 0 : 1,
-      exitPrice: stratPnl >= 0 ? 1 : 0,
-      qty: Math.abs(stratPnl),
+      overridePnl: true,
+      manualPnl: stratPnl,
       fees: 0,
-      symbol: "STRAT",
-      entryDateTime: t.entryDateTime
+      exitDateTime: t.exitDateTime || t.entryDateTime
     };
   });
   const strategySharpe = calcSharpeRatio(strategyTrades, startingBalance);
@@ -781,10 +779,20 @@ export function calcMfe(trade) {
   // 2. maxPrice / minPrice fields
   const maxP = parseFloat(trade.maxPrice);
   const minP = parseFloat(trade.minPrice);
-  if (dir === "long" && !isNaN(maxP) && maxP > entry * 0.1 && maxP < entry * 3) {
-    mfe = Math.max(mfe, Math.max(0, maxP - entry) * qty * mult);
-  } else if (dir === "short" && !isNaN(minP) && minP > entry * 0.1 && minP < entry * 3) {
-    mfe = Math.max(mfe, Math.max(0, entry - minP) * qty * mult);
+
+  if (!isNaN(maxP) && maxP > 0) {
+    if (entry > 0 && maxP > entry * 0.1 && maxP < entry * 3) {
+      if (dir === "long") mfe = Math.max(mfe, Math.max(0, maxP - entry) * qty * mult);
+      else mfe = Math.max(mfe, Math.max(0, entry - maxP) * qty * mult);
+    } else {
+      mfe = Math.max(mfe, maxP);
+    }
+  }
+
+  if (!isNaN(minP) && minP > 0) {
+    if (entry > 0 && minP > entry * 0.1 && minP < entry * 3) {
+      if (dir === "short") mfe = Math.max(mfe, Math.max(0, entry - minP) * qty * mult);
+    }
   }
 
   return mfe;
@@ -820,10 +828,20 @@ export function calcMae(trade) {
 
   const maxP = parseFloat(trade.maxPrice);
   const minP = parseFloat(trade.minPrice);
-  if (dir === "long" && !isNaN(minP) && minP > entry * 0.1 && minP < entry * 3) {
-    mae = Math.max(mae, Math.max(0, entry - minP) * qty * mult);
-  } else if (dir === "short" && !isNaN(maxP) && maxP > entry * 0.1 && maxP < entry * 3) {
-    mae = Math.max(mae, Math.max(0, maxP - entry) * qty * mult);
+
+  if (!isNaN(minP) && minP > 0) {
+    if (entry > 0 && minP > entry * 0.1 && minP < entry * 3) {
+      if (dir === "long") mae = Math.max(mae, Math.max(0, entry - minP) * qty * mult);
+      else mae = Math.max(mae, Math.max(0, minP - entry) * qty * mult);
+    } else {
+      mae = Math.max(mae, minP);
+    }
+  }
+
+  if (!isNaN(maxP) && maxP > 0) {
+    if (entry > 0 && maxP > entry * 0.1 && maxP < entry * 3) {
+      if (dir === "short") mae = Math.max(mae, Math.max(0, maxP - entry) * qty * mult);
+    }
   }
 
   return mae;
