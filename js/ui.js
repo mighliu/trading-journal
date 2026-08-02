@@ -961,29 +961,30 @@ export function updateLiveCalc() {
   liveDurationEl.textContent = formatDuration(duration);
 
   // Signal live updates
-  const signalEntry = parseFloat(document.getElementById("tradeSignalEntryPrice").value);
-  const signalExit = parseFloat(document.getElementById("tradeSignalExitPrice").value);
+  const hasIntervention = document.getElementById("tradeHasIntervention")?.checked;
+  const interventionType = hasIntervention ? (document.getElementById("tradeIntervention")?.value || "followed") : "followed";
 
-  if (!isNaN(signalEntry) || !isNaN(signalExit)) {
-    const mockTradeWithSignal = {
-      ...mockTrade,
-      signalEntryPrice: isNaN(signalEntry) ? null : signalEntry,
-      signalExitPrice: isNaN(signalExit) ? null : signalExit
-    };
+  const signalEntryInput = document.getElementById("tradeSignalEntryPrice")?.value;
+  const signalExitInput = document.getElementById("tradeSignalExitPrice")?.value;
 
-    const sPnl = calcSignalPnl(mockTradeWithSignal);
-    const diff = calcPnlDiff(sPnl, net);
+  const mockTradeWithSignal = {
+    ...mockTrade,
+    interventionType,
+    signalEntryPrice: signalEntryInput ? parseFloat(signalEntryInput) : null,
+    signalExitPrice: signalExitInput ? parseFloat(signalExitInput) : null
+  };
 
-    if (liveSignalPnlEl) {
-      liveSignalPnlEl.textContent = formatCurrency(sPnl);
-      liveSignalPnlEl.className = `live-math-val ${sPnl > 0 ? "profit" : sPnl < 0 ? "loss" : ""}`;
-    }
+  const sPnl = calcSignalPnl(mockTradeWithSignal);
+  const diff = net - sPnl;
 
-    if (liveSignalDiffEl) {
-      liveSignalDiffEl.textContent = formatCurrency(diff);
-      // diff > 0 means Actual P&L is greater than Signal P&L (saved money / beat the signal)
-      liveSignalDiffEl.className = `live-math-val ${diff > 0 ? "profit" : diff < 0 ? "loss" : ""}`;
-    }
+  if (liveSignalPnlEl) {
+    liveSignalPnlEl.textContent = formatCurrency(sPnl);
+    liveSignalPnlEl.className = `live-math-val ${sPnl > 0 ? "profit" : sPnl < 0 ? "loss" : ""}`;
+  }
+
+  if (liveSignalDiffEl) {
+    liveSignalDiffEl.textContent = formatCurrency(diff);
+    liveSignalDiffEl.className = `live-math-val ${diff > 0 ? "profit" : diff < 0 ? "loss" : ""}`;
   } else {
     if (liveSignalPnlEl) {
       liveSignalPnlEl.textContent = "-";
