@@ -1300,7 +1300,9 @@ export function setupUIListeners() {
             if (currentDirection === "long") mfe = diff * qtyVal * mult;
             else mae = diff * qtyVal * mult;
           } else {
-            mfe = maxPriceVal;
+            // For short trades: max price = adverse excursion (MAE), for long = favorable (MFE)
+            if (currentDirection === "short") { mae = maxPriceVal; }
+            else { mfe = maxPriceVal; }
           }
         }
 
@@ -1311,7 +1313,9 @@ export function setupUIListeners() {
             if (currentDirection === "long") mae = diff * qtyVal * mult;
             else mfe = diff * qtyVal * mult;
           } else {
-            mae = minPriceVal;
+            // For short trades: min price = favorable excursion (MFE), for long = adverse (MAE)
+            if (currentDirection === "short") { mfe = minPriceVal; }
+            else { mae = minPriceVal; }
           }
         }
       }
@@ -1549,29 +1553,6 @@ export function setupUIListeners() {
   }
 
   // Global Keyboard shortcuts handler
-  document.addEventListener("keydown", (e) => {
-    // If inside input, textarea or select, ignore keyboard shortcuts
-    const active = document.activeElement;
-    if (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT") {
-      if (e.key === "Escape") {
-        closeTradeModal();
-        closeSettingsModal();
-      }
-      return;
-    }
-
-    if (e.key.toLowerCase() === "n") {
-      e.preventDefault();
-      openTradeModal();
-    }
-    
-    if (e.key === "Escape") {
-      closeTradeModal();
-      closeSettingsModal();
-      closeDayPanel();
-    }
-  });
-
   // Delegated Trade Log actions (expand, edit, delete)
   const tbody = document.getElementById("tradeLogTbody");
   if (tbody) {

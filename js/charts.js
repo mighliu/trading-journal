@@ -1166,8 +1166,8 @@ export function renderSlippageSymbolChart(trades) {
 
   const symbolSlippage = {};
   for (const trade of trades) {
-    if (isSkippedTrade(trade)) continue;
-    if (hasSevereDeviation(trade) || trade.signalEntryPrice != null || trade.signalExitPrice != null) {
+    // Include skipped trades: actPnl=0 vs sigPnl = opportunity cost / avoided loss
+    if (hasSevereDeviation(trade) || isSkippedTrade(trade) || trade.signalEntryPrice != null || trade.signalExitPrice != null) {
       const actPnl = calcNetPnl(trade);
       const sigPnl = calcSignalPnl(trade);
       const slippage = actPnl - sigPnl; // positive is good
@@ -1355,9 +1355,10 @@ export function renderCumulativeSlippageChart(trades) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
-  // Filter trades that have at least one signal parameter defined or are interventions
+  // Filter trades that have at least one signal parameter defined, are interventions, or were skipped
+  // Skipped trades have actPnl=0 and sigPnl=opportunity cost — valid slippage data
   const sigTrades = trades
-    .filter(t => !isSkippedTrade(t) && (hasSevereDeviation(t) || t.signalEntryPrice != null || t.signalExitPrice != null))
+    .filter(t => hasSevereDeviation(t) || isSkippedTrade(t) || t.signalEntryPrice != null || t.signalExitPrice != null)
     .sort((a, b) => new Date(a.exitDateTime) - new Date(b.exitDateTime));
 
   if (sigTrades.length === 0) {
