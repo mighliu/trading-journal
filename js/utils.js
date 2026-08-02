@@ -120,11 +120,6 @@ export function calcSignalPnl(trade) {
 
   // 4. Early Profit Cut (Profit Protect)
   if (type === "early_profit") {
-    if (trade.signalExitPrice != null && !isNaN(parseFloat(trade.signalExitPrice)) && parseFloat(trade.signalExitPrice) !== exit) {
-      const sigEntry = trade.signalEntryPrice != null && !isNaN(parseFloat(trade.signalEntryPrice)) ? parseFloat(trade.signalEntryPrice) : entry;
-      const sigExit = parseFloat(trade.signalExitPrice);
-      return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-    }
     const mfeRaw = parseFloat(trade.mfe != null ? trade.mfe : trade.maxPrice);
     if (!isNaN(mfeRaw) && mfeRaw > 0) {
       if (entry > 0 && mfeRaw > entry * 0.1 && mfeRaw < entry * 3) {
@@ -139,11 +134,6 @@ export function calcSignalPnl(trade) {
 
   // 5. Early Loss Cut (Loss Stop)
   if (type === "early_loss") {
-    if (trade.signalExitPrice != null && !isNaN(parseFloat(trade.signalExitPrice)) && parseFloat(trade.signalExitPrice) !== exit) {
-      const sigEntry = trade.signalEntryPrice != null && !isNaN(parseFloat(trade.signalEntryPrice)) ? parseFloat(trade.signalEntryPrice) : entry;
-      const sigExit = parseFloat(trade.signalExitPrice);
-      return (sigExit - sigEntry) * qty * mult * dirMult - fees;
-    }
     const stopRaw = parseFloat(trade.stopLoss);
     if (!isNaN(stopRaw) && stopRaw > 0) {
       if (entry > 0 && stopRaw > entry * 0.1 && stopRaw < entry * 3) {
@@ -167,15 +157,8 @@ export function calcSignalPnl(trade) {
 
   // 6. Late Entry Chase
   if (type === "late_entry") {
-    let sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
-    if (trade.signalEntryPrice != null && !isNaN(parseFloat(trade.signalEntryPrice)) && parseFloat(trade.signalEntryPrice) !== entry) {
-      sigEntry = parseFloat(trade.signalEntryPrice);
-    }
-    let sigExit = exit;
-    if (trade.signalExitPrice != null && !isNaN(parseFloat(trade.signalExitPrice)) && parseFloat(trade.signalExitPrice) !== exit) {
-      sigExit = parseFloat(trade.signalExitPrice);
-    }
-    return (sigExit - sigEntry) * qty * mult * dirMult - fees;
+    const sigEntry = direction === "long" ? entry * 0.995 : entry * 1.005;
+    return (exit - sigEntry) * qty * mult * dirMult - fees;
   }
 
   // 7. Explicit signal prices provided as fallback
